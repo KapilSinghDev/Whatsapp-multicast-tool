@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Automation Tool</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <header>
+        <h1>WhatsApp Automation Tool</h1>
+        <p>Send automated messages to your contacts</p>
+    </header>
+
+    <div class="container">
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div>
+                <button id="connectBtn">Connect WhatsApp</button>
+                <button id="logoutBtn" class="danger">Logout</button>
+            </div>
+        </div>
+
+        <div class="qr-container" id="qrContainer">
+            <h2>Scan this QR code with WhatsApp</h2>
+            <div id="qrCode"></div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h2>Upload Contacts</h2>
+                <div class="form-group">
+                    <p>Upload a CSV file with phone numbers (should include 91 prefix)</p>
+                    <div class="file-upload">
+                        <label for="contactsFile">Choose File</label>
+                        <input type="file" id="contactsFile" accept=".csv">
+                        <span class="file-name" id="contactsFileName">No file chosen</span>
+                    </div>
+                </div>
+                <button id="uploadContactsBtn">Upload Contacts</button>
+            </div>
+
+            <div class="card">
+                <h2>Upload Media</h2>
+                <div class="form-group">
+                    <p>Upload an image or video to send with your messages</p>
+                    <div class="file-upload">
+                        <label for="mediaFile">Choose File</label>
+                        <input type="file" id="mediaFile" accept="image/*,video/*">
+                        <span class="file-name" id="mediaFileName">No file chosen</span>
+                    </div>
+                </div>
+                <button id="uploadMediaBtn">Upload Media</button>
+            </div>
+
+            <div class="card full-width">
+                <h2>Message Settings</h2>
+                <div class="form-group">
+                    <label for="salutation">Salutation</label>
+                    <input type="text" id="salutation" placeholder="Sir/Madam">
+                </div>
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <textarea id="message" placeholder="Enter your message here..."></textarea>
+                </div>
+                <button id="saveMessageBtn">Save Message</button>
+            </div>
+
+            <div class="card full-width">
+                <h2>Campaign Control</h2>
+                <p>Start sending messages to all uploaded contacts</p>
+                <div class="row">
+                    <button id="startCampaignBtn" class="success">Start Campaign</button>
+                </div>
+                <div class="logs" id="logs">
+                    <div class="log-entry info">System ready. Connect WhatsApp to begin.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
