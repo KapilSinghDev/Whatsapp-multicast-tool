@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import fs from 'fs/promises';
-import { createReadStream, existsSync, unlinkSync , readFileSync } from 'fs';
+import { createReadStream, existsSync, unlinkSync , readFileSync, } from 'fs';
 import csv from 'csv-parser';
 import XLSX from 'xlsx';
 import cors from 'cors';
@@ -70,6 +70,7 @@ function readContactsFromExcel(filePath) {
   return data.map((entry) => ({
     phone: String(entry.phone).trim(),
     name: entry.name && String(entry.name).trim() !== "" ? String(entry.name).trim() : null,
+    sent:entry.sent
   }));
 }
 
@@ -83,9 +84,45 @@ function writeContactsToExcel(filePath, contacts) {
     };
   });
 
+  
+
   const worksheet = XLSX.utils.json_to_sheet(normalizedContacts);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Contacts');
+  XLSX.writeFile(workbook, filePath);
+}
+
+function updateContactStatusInExcel(filePath, updatedContacts) {
+  if (!existsSync(filePath)) {
+    console.error('File does not exist:', filePath);
+    return;
+  }
+
+  // Load the workbook and get the first sheet
+  const workbook = XLSX.readFile(filePath);
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+
+  // Convert sheet to JSON
+  const existingContacts = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+  // Create a map for quick lookup of updated contacts by phone
+  const updatedMap = new Map(
+    updatedContacts.map(contact => [String(contact.phone).trim(), true])
+  );
+
+  // Update 'sent' field in existing contacts
+  const updatedSheetData = existingContacts.map((contact) => {
+    const phone = String(contact.phone).trim();
+    return {
+      ...contact,
+      sent: updatedMap.has(phone) ? true : contact.sent || false
+    };
+  });
+
+  // Convert back to sheet and write to file
+  const newWorksheet = XLSX.utils.json_to_sheet(updatedSheetData);
+  workbook.Sheets[sheetName] = newWorksheet;
   XLSX.writeFile(workbook, filePath);
 }
 
@@ -549,8 +586,8 @@ app.post('/bot/start', async (req, res) => {
         console.error(`Failed to send message to ${number}:`, err.message);
       }
     }
-
-    writeContactsToExcel(CONTACTS_FILE, contacts);
+    console.log('contacts are update are ->' ,unsentContacts)
+    updateContactStatusInExcel(CONTACTS_FILE, unsentContacts);
 
     res.status(200).json({
       status: 200,
