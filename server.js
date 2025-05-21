@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import fs from 'fs/promises';
-import { createReadStream, existsSync, unlinkSync } from 'fs';
+import { createReadStream, existsSync, unlinkSync , readFileSync } from 'fs';
 import csv from 'csv-parser';
 import XLSX from 'xlsx';
 import cors from 'cors';
@@ -80,13 +80,56 @@ function readContactsFromCSV(filepath) {
     createReadStream(filepath)
       .pipe(csv())
       .on('data', (row) => {
-        if (row.phone) contacts.push(row.phone.trim());
+        console.log('Raw row data:', row); // Debug: see what the row actually contains
+        
+        // Check if row.phone is a string or an object
+        if (row.phone && typeof row.phone === 'object') {
+          // Handle the case where row.phone is already an object (prevent nesting)
+          console.log('Phone is an object:', row.phone);
+          contacts.push({
+            phone: row.phone.phone || '',  // Extract the phone number from the object
+            sent: false
+          });
+        } else if (row.phone && typeof row.phone === 'string') {
+          // Normal case: row.phone is a string
+          contacts.push({
+            phone: row.phone.trim(),
+            sent: false
+          });
+        } else {
+          // Try to find any field that might contain a phone number
+          let phoneFound = false;
+          for (const key in row) {
+            const value = row[key];
+            if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+              contacts.push({
+                phone: value.trim(),
+                sent: false
+              });
+              phoneFound = true;
+              break;
+            }
+          }
+          
+          if (!phoneFound) {
+            console.log('No phone number found in row:', row);
+          }
+        }
       })
-      .on('end', () => resolve(contacts))
-      .on('error', reject);
+      .on('end', () => {
+        console.log(`CSV processing complete. Found ${contacts.length} contacts.`);
+        // Let's inspect the structure of the contacts to verify it's correct
+        if (contacts.length > 0) {
+          console.log('Sample contact structure:', JSON.stringify(contacts[0], null, 2));
+        }
+        resolve(contacts);
+      })
+      .on('error', (error) => {
+        console.error('Error reading CSV:', error);
+        reject(error);
+      });
   });
 }
-
 async function storeCustomDetails(salutation, message) {
   try {
     await ensureDirectoryExists(path.join(__dirname, 'message'));
@@ -240,6 +283,50 @@ app.get('/bot/qr', (req, res) => {
 
 // to take the csv of the contacts 
 // Note : the contacts should have 91 in the start
+// app.post('/bot/numbers', upload.single('file'), async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({
+//         status: 400,
+//         message: 'No file uploaded',
+//       });
+//     }
+    
+//     const csvFilePath = req.file.path;
+//     const newContacts = await readContactsFromCSV(csvFilePath);
+//     const existingContacts = readContactsFromExcel(CONTACTS_FILE);
+//     const existingNumbers = new Set(existingContacts.map(contact => contact.phone));
+//     const uniqueNewContacts = newContacts
+//       .filter(number => !existingNumbers.has(number))
+//       .map(number => ({ phone: number, sent: false }));
+
+//     const updatedContacts = [...existingContacts, ...uniqueNewContacts];
+//     console.log('uploaded contacts -> ' , updatedContacts)
+//     writeContactsToExcel(CONTACTS_FILE, updatedContacts);
+
+//     // Clean up the uploaded file
+//     unlinkSync(csvFilePath);
+
+//     res.status(200).json({
+//       status: 200,
+//       message: 'File processed successfully',
+//       newContactsAdded: uniqueNewContacts.length,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     // Clean up the uploaded file if it exists
+//     if (req.file && existsSync(req.file.path)) {
+//       unlinkSync(req.file.path);
+//     }
+    
+//     res.status(500).json({
+//       status: 500,
+//       message: 'Failed to process CSV',
+//       error: error.message,
+//     });
+//   }
+// });
+
 app.post('/bot/numbers', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -251,18 +338,50 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
     
     const csvFilePath = req.file.path;
     const newContacts = await readContactsFromCSV(csvFilePath);
-    const existingContacts = readContactsFromExcel(CONTACTS_FILE);
+    
+    console.log('Uploaded contacts before normalization:', newContacts);
+    
+    // Normalize the contacts to fix nested structure issues
+    const normalizedContacts = newContacts.map(contact => {
+      // If contact.phone is an object with a phone property, flatten it
+      if (typeof contact.phone === 'object' && contact.phone !== null && contact.phone.phone) {
+        return {
+          phone: contact.phone.phone,
+          sent: false
+        };
+      }
+      // Otherwise keep the structure as is
+      return {
+        phone: contact.phone,
+        sent: false
+      };
+    });
+    
+    console.log('Normalized contacts:', normalizedContacts);
+    
+    // Make sure the contacts file exists before trying to read from it
+    let existingContacts = [];
+    if (existsSync(CONTACTS_FILE)) {
+      existingContacts = readContactsFromExcel(CONTACTS_FILE);
+    }
+    
     const existingNumbers = new Set(existingContacts.map(contact => contact.phone));
-    const uniqueNewContacts = newContacts
-      .filter(number => !existingNumbers.has(number))
-      .map(number => ({ phone: number, sent: false }));
-
+    
+    // Filter out duplicates
+    const uniqueNewContacts = normalizedContacts
+      .filter(contact => !existingNumbers.has(contact.phone));
+    
+    // Combine existing contacts with unique new contacts
     const updatedContacts = [...existingContacts, ...uniqueNewContacts];
+    
+    console.log('Final contacts to write:', updatedContacts);
+    
+    // Write the updated contacts back to the Excel file
     writeContactsToExcel(CONTACTS_FILE, updatedContacts);
-
+    
     // Clean up the uploaded file
     unlinkSync(csvFilePath);
-
+    
     res.status(200).json({
       status: 200,
       message: 'File processed successfully',
@@ -401,7 +520,7 @@ app.post('/bot/start', async (req, res) => {
     const messageData = await readMessageData();
     
     // Find the most recent media file in the media directory
-    const mediaDir = path.join(__dirname, 'media');
+    const mediaDir = path.join(__dirname, 'assets');
     let mediaPath = '';
     
     try {
