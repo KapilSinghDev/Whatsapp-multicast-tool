@@ -59,16 +59,40 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Helper functions
+// function readContactsFromExcel(filePath) {
+//   if (!existsSync(filePath)) return [];
+//   const workbook = XLSX.readFile(filePath);
+//   const sheet = workbook.Sheets[workbook.SheetNames[0]];
+//   console.log(sheet)
+//   return XLSX.utils.sheet_to_json(sheet);
+// }
+
 function readContactsFromExcel(filePath) {
   if (!existsSync(filePath)) return [];
-  const workbook = XLSX.readFile(filePath);
+
+  const workbook = XLSX.readFile(filePath, { type: "file", raw: false });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  console.log(sheet)
-  return XLSX.utils.sheet_to_json(sheet);
+
+  const data = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+  return data.map((entry) => ({
+    phone: String(entry.phone).trim(),
+    name: entry.name && String(entry.name).trim() !== "" ? String(entry.name).trim() : null,
+  }));
 }
 
+
 function writeContactsToExcel(filePath, contacts) {
-  const worksheet = XLSX.utils.json_to_sheet(contacts);
+  const normalizedContacts = contacts.map((contact) => {
+    const nameKey = Object.keys(contact).find((key) => key.trim().toLowerCase() === 'name');
+    return {
+      phone: String(contact.phone).trim(),
+      name: nameKey && contact[nameKey]?.toString().trim() !== '' ? contact[nameKey].toString().trim() : 'NULL',
+      sent: false // Add sent column with default false
+    };
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(normalizedContacts);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Contacts');
   XLSX.writeFile(workbook, filePath);
@@ -80,45 +104,47 @@ function readContactsFromCSV(filepath) {
     createReadStream(filepath)
       .pipe(csv())
       .on('data', (row) => {
-        console.log('Raw row data:', row); // Debug: see what the row actually contains
-        
-        // Check if row.phone is a string or an object
+        console.log('Raw row data:', row);
+
+        let phone = '';
+        let name = '';
+
+        // Normalize and extract phone number
         if (row.phone && typeof row.phone === 'object') {
-          // Handle the case where row.phone is already an object (prevent nesting)
-          console.log('Phone is an object:', row.phone);
-          contacts.push({
-            phone: row.phone.phone || '',  // Extract the phone number from the object
-            sent: false
-          });
+          phone = row.phone.phone || '';
         } else if (row.phone && typeof row.phone === 'string') {
-          // Normal case: row.phone is a string
-          contacts.push({
-            phone: row.phone.trim(),
-            sent: false
-          });
+          phone = row.phone.trim();
         } else {
-          // Try to find any field that might contain a phone number
-          let phoneFound = false;
           for (const key in row) {
             const value = row[key];
             if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-              contacts.push({
-                phone: value.trim(),
-                sent: false
-              });
-              phoneFound = true;
+              phone = value.trim();
               break;
             }
           }
-          
-          if (!phoneFound) {
-            console.log('No phone number found in row:', row);
-          }
+        }
+
+        // Normalize and extract name (case-insensitive search)
+        const nameKey = Object.keys(row).find((key) => key.trim().toLowerCase() === 'name');
+        if (nameKey && row[nameKey]?.toString().trim() !== '') {
+          name = row[nameKey].toString().trim();
+        } else {
+          name = 'NULL';
+        }
+
+        // Only push if phone is found
+        if (phone) {
+          contacts.push({
+            phone,
+            name,
+            sent: false,
+          });
+        } else {
+          console.log('No phone number found in row:', row);
         }
       })
       .on('end', () => {
         console.log(`CSV processing complete. Found ${contacts.length} contacts.`);
-        // Let's inspect the structure of the contacts to verify it's correct
         if (contacts.length > 0) {
           console.log('Sample contact structure:', JSON.stringify(contacts[0], null, 2));
         }
@@ -130,6 +156,7 @@ function readContactsFromCSV(filepath) {
       });
   });
 }
+
 async function storeCustomDetails(salutation, message) {
   try {
     await ensureDirectoryExists(path.join(__dirname, 'message'));
@@ -342,22 +369,22 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
     console.log('Uploaded contacts before normalization:', newContacts);
     
     // Normalize the contacts to fix nested structure issues
-    const normalizedContacts = newContacts.map(contact => {
-      // If contact.phone is an object with a phone property, flatten it
-      if (typeof contact.phone === 'object' && contact.phone !== null && contact.phone.phone) {
-        return {
-          phone: contact.phone.phone,
-          sent: false
-        };
-      }
-      // Otherwise keep the structure as is
-      return {
-        phone: contact.phone,
-        sent: false
-      };
-    });
+    // const normalizedContacts = newContacts.map(contact => {
+    //   // If contact.phone is an object with a phone property, flatten it
+    //   if (typeof contact.phone === 'object' && contact.phone !== null && contact.phone.phone) {
+    //     return {
+    //       phone: contact.phone.phone,
+    //       sent: false
+    //     };
+    //   }
+    //   // Otherwise keep the structure as is
+    //   return {
+    //     phone: contact.phone,
+    //     sent: false
+    //   };
+    // });
     
-    console.log('Normalized contacts:', normalizedContacts);
+    console.log('Normalized contacts:', newContacts);
     
     // Make sure the contacts file exists before trying to read from it
     let existingContacts = [];
@@ -368,7 +395,7 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
     const existingNumbers = new Set(existingContacts.map(contact => contact.phone));
     
     // Filter out duplicates
-    const uniqueNewContacts = normalizedContacts
+    const uniqueNewContacts = newContacts
       .filter(contact => !existingNumbers.has(contact.phone));
     
     // Combine existing contacts with unique new contacts
@@ -500,7 +527,9 @@ app.post('/bot/start', async (req, res) => {
     }
 
     const contacts = readContactsFromExcel(CONTACTS_FILE);
+    console.log('the contacts fetched are' , contacts)
     const unsentContacts = contacts.filter(contact => !contact.sent);
+    console.log('the unsentcontacts fetched are' , unsentContacts)
 
     if (unsentContacts.length === 0) {
       return res.status(200).json({
@@ -562,8 +591,13 @@ app.post('/bot/start', async (req, res) => {
         chatId = '91' + chatId;
       }
       chatId = chatId + '@c.us';
-      
-      const salutation = messageData.salutation || '';
+      let salutation = contact.name;
+      if(salutation == 'NULL'){
+        console.log('null found' , contact.phone)
+        salutation = messageData.salutation;
+        console.log('updated salutaions ->' , salutation)
+      }
+      // salutation = contact.name;
       const text = messageData.message || '';
       const caption = 'Hello ' + salutation + ' ' + text;
       console.log(caption)
