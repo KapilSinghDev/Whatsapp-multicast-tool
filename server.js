@@ -58,14 +58,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Helper functions
-// function readContactsFromExcel(filePath) {
-//   if (!existsSync(filePath)) return [];
-//   const workbook = XLSX.readFile(filePath);
-//   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-//   console.log(sheet)
-//   return XLSX.utils.sheet_to_json(sheet);
-// }
 
 function readContactsFromExcel(filePath) {
   if (!existsSync(filePath)) return [];
@@ -80,7 +72,6 @@ function readContactsFromExcel(filePath) {
     name: entry.name && String(entry.name).trim() !== "" ? String(entry.name).trim() : null,
   }));
 }
-
 
 function writeContactsToExcel(filePath, contacts) {
   const normalizedContacts = contacts.map((contact) => {
@@ -308,51 +299,6 @@ app.get('/bot/qr', (req, res) => {
   }, 30000);
 });
 
-// to take the csv of the contacts 
-// Note : the contacts should have 91 in the start
-// app.post('/bot/numbers', upload.single('file'), async (req, res) => {
-//   try {
-//     if (!req.file) {
-//       return res.status(400).json({
-//         status: 400,
-//         message: 'No file uploaded',
-//       });
-//     }
-    
-//     const csvFilePath = req.file.path;
-//     const newContacts = await readContactsFromCSV(csvFilePath);
-//     const existingContacts = readContactsFromExcel(CONTACTS_FILE);
-//     const existingNumbers = new Set(existingContacts.map(contact => contact.phone));
-//     const uniqueNewContacts = newContacts
-//       .filter(number => !existingNumbers.has(number))
-//       .map(number => ({ phone: number, sent: false }));
-
-//     const updatedContacts = [...existingContacts, ...uniqueNewContacts];
-//     console.log('uploaded contacts -> ' , updatedContacts)
-//     writeContactsToExcel(CONTACTS_FILE, updatedContacts);
-
-//     // Clean up the uploaded file
-//     unlinkSync(csvFilePath);
-
-//     res.status(200).json({
-//       status: 200,
-//       message: 'File processed successfully',
-//       newContactsAdded: uniqueNewContacts.length,
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     // Clean up the uploaded file if it exists
-//     if (req.file && existsSync(req.file.path)) {
-//       unlinkSync(req.file.path);
-//     }
-    
-//     res.status(500).json({
-//       status: 500,
-//       message: 'Failed to process CSV',
-//       error: error.message,
-//     });
-//   }
-// });
 
 app.post('/bot/numbers', upload.single('file'), async (req, res) => {
   try {
@@ -367,22 +313,6 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
     const newContacts = await readContactsFromCSV(csvFilePath);
     
     console.log('Uploaded contacts before normalization:', newContacts);
-    
-    // Normalize the contacts to fix nested structure issues
-    // const normalizedContacts = newContacts.map(contact => {
-    //   // If contact.phone is an object with a phone property, flatten it
-    //   if (typeof contact.phone === 'object' && contact.phone !== null && contact.phone.phone) {
-    //     return {
-    //       phone: contact.phone.phone,
-    //       sent: false
-    //     };
-    //   }
-    //   // Otherwise keep the structure as is
-    //   return {
-    //     phone: contact.phone,
-    //     sent: false
-    //   };
-    // });
     
     console.log('Normalized contacts:', newContacts);
     
