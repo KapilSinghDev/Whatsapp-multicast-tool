@@ -83,16 +83,13 @@ function writeContactsToExcel(filePath, contacts) {
       sent: false // Add sent column with default false
     };
   });
-
-  
-
   const worksheet = XLSX.utils.json_to_sheet(normalizedContacts);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Contacts');
   XLSX.writeFile(workbook, filePath);
 }
 
-function updateContactStatusInExcel(filePath, updatedContacts) {
+function updateContactStatusInExcel(filePath, updatedContacts ,newStatus) {
   if (!existsSync(filePath)) {
     console.error('File does not exist:', filePath);
     return;
@@ -116,7 +113,8 @@ function updateContactStatusInExcel(filePath, updatedContacts) {
     const phone = String(contact.phone).trim();
     return {
       ...contact,
-      sent: updatedMap.has(phone) ? true : contact.sent || false
+      sent:newStatus 
+      // updatedMap.has(phone) ? true : contact.sent || false
     };
   });
 
@@ -364,6 +362,9 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
     // Filter out duplicates
     const uniqueNewContacts = newContacts
       .filter(contact => !existingNumbers.has(contact.phone));
+
+    // filter out repeated contacts 
+    const repeatedContacts = newContacts.filter(contact => existingNumbers.has(contact.phone))
     
     // Combine existing contacts with unique new contacts
     const updatedContacts = [...existingContacts, ...uniqueNewContacts];
@@ -372,7 +373,10 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
     
     // Write the updated contacts back to the Excel file
     writeContactsToExcel(CONTACTS_FILE, updatedContacts);
+    // mark reappeared number as true
     
+    updateContactStatusInExcel(CONTACTS_FILE,repeatedContacts,false)
+
     // Clean up the uploaded file
     unlinkSync(csvFilePath);
     
@@ -380,6 +384,7 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
       status: 200,
       message: 'File processed successfully',
       newContactsAdded: uniqueNewContacts.length,
+      repeatedContacts:repeatedContacts.length
     });
   } catch (error) {
     console.error(error);
@@ -569,11 +574,20 @@ app.post('/bot/start', async (req, res) => {
       const caption = 'Hello ' + salutation + ' ' + text;
       console.log(caption)
       try {
-        if (existsSync(mediaPath)) {
+        // if (existsSync(mediaPath)) {
+        //   const media = MessageMedia.fromFilePath(mediaPath);
+        //   await client.sendMessage(chatId, media, { caption });
+        // } else {
+        //   // Send text only if no media is available
+        //   await client.sendMessage(chatId, caption);
+        // }
+        const isHiddenFile = filePath => path.basename(filePath).startsWith('.');
+
+        if (!isHiddenFile(mediaPath) && existsSync(mediaPath)) {
           const media = MessageMedia.fromFilePath(mediaPath);
           await client.sendMessage(chatId, media, { caption });
         } else {
-          // Send text only if no media is available
+          // Send text only if no media is available or it's a hidden file
           await client.sendMessage(chatId, caption);
         }
         
@@ -587,7 +601,7 @@ app.post('/bot/start', async (req, res) => {
       }
     }
     console.log('contacts are update are ->' ,unsentContacts)
-    updateContactStatusInExcel(CONTACTS_FILE, unsentContacts);
+    updateContactStatusInExcel(CONTACTS_FILE, unsentContacts , true);
 
     res.status(200).json({
       status: 200,

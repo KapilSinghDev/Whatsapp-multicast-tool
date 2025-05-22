@@ -156,7 +156,7 @@
                 const data = await response.json();
                 
                 if (data.status === 200) {
-                    addLog(`Contact upload successful. Added ${data.newContactsAdded} new contacts.`, 'success');
+                    addLog(`Successful. ${data.newContactsAdded} new contacts and ${data.repeatedContacts} were repeats`, 'success');
                     contactsFileName.textContent = 'No file chosen';
                     contactsFile.value = '';
                 } else {
