@@ -45,7 +45,7 @@ async function initializeMessageFile() {
       message: ""
     };
     await fs.writeFile(MESSAGE_FILE, JSON.stringify(defaultMessage, null, 2), 'utf-8');
-    console.log('Created default message file');
+    // console.log('Created default message file');
   }
 }
 
@@ -91,7 +91,7 @@ function writeContactsToExcel(filePath, contacts) {
 
 function updateContactStatusInExcel(filePath, updatedContacts ,newStatus) {
   if (!existsSync(filePath)) {
-    console.error('File does not exist:', filePath);
+    // console.error('File does not exist:', filePath);
     return;
   }
 
@@ -130,7 +130,7 @@ function readContactsFromCSV(filepath) {
     createReadStream(filepath)
       .pipe(csv())
       .on('data', (row) => {
-        console.log('Raw row data:', row);
+        // console.log('Raw row data:', row);
 
         let phone = '';
         let name = '';
@@ -166,18 +166,18 @@ function readContactsFromCSV(filepath) {
             sent: false,
           });
         } else {
-          console.log('No phone number found in row:', row);
+          // console.log('No phone number found in row:', row);
         }
       })
       .on('end', () => {
-        console.log(`CSV processing complete. Found ${contacts.length} contacts.`);
+        // console.log(`CSV processing complete. Found ${contacts.length} contacts.`);
         if (contacts.length > 0) {
-          console.log('Sample contact structure:', JSON.stringify(contacts[0], null, 2));
+          // console.log('Sample contact structure:', JSON.stringify(contacts[0], null, 2));
         }
         resolve(contacts);
       })
       .on('error', (error) => {
-        console.error('Error reading CSV:', error);
+        // console.error('Error reading CSV:', error);
         reject(error);
       });
   });
@@ -192,10 +192,10 @@ async function storeCustomDetails(salutation, message) {
     };
     
     await fs.writeFile(MESSAGE_FILE, JSON.stringify(defaultMessage, null, 2), 'utf-8');
-    console.log('Message successfully saved.');
+    // console.log('Message successfully saved.');
     return true;
   } catch (error) {
-    console.error('Error handling the file:', error);
+    // console.error('Error handling the file:', error);
     return false;
   }
 }
@@ -205,7 +205,7 @@ async function readMessageData() {
     const data = await fs.readFile(MESSAGE_FILE, 'utf-8');
     return JSON.parse(data);
   } catch (error) {
-    console.error('Error reading message data:', error);
+    // console.error('Error reading message data:', error);
     return { salutation: "", message: "" };
   }
 }
@@ -225,12 +225,12 @@ function initializeWhatsAppClient() {
   });
   
   client.on('ready', () => {
-    console.log('WhatsApp client is ready!');
+    // console.log('WhatsApp client is ready!');
     clientReady = true;
   });
   
   client.on('disconnected', () => {
-    console.log('WhatsApp client disconnected');
+    // // console.log('WhatsApp client disconnected');
     clientReady = false;
     client = null;
   });
@@ -295,7 +295,7 @@ app.get('/bot/qr', (req, res) => {
   });
   
   client.on('ready', () => {
-    console.log('WhatsApp client is ready!');
+    // console.log('WhatsApp client is ready!');
     clientReady = true;
     // If the QR wasn't sent yet, send a success message
     if (!qrSent) {
@@ -305,11 +305,11 @@ app.get('/bot/qr', (req, res) => {
   });
   
   client.on('authenticated', () => {
-    console.log('WhatsApp client is authenticated!');
+    // console.log('WhatsApp client is authenticated!');
   });
   
   client.on('auth_failure', (err) => {
-    console.error('WhatsApp authentication failed:', err);
+    // console.error('WhatsApp authentication failed:', err);
     if (!qrSent) {
       qrSent = true;
       res.status(500).send('Authentication failed: ' + err.message);
@@ -318,7 +318,7 @@ app.get('/bot/qr', (req, res) => {
   
   // Start the client
   client.initialize().catch(err => {
-    console.error('Failed to initialize WhatsApp client:', err);
+    // console.error('Failed to initialize WhatsApp client:', err);
     if (!qrSent) {
       qrSent = true;
       res.status(500).send('Failed to initialize WhatsApp client: ' + err.message);
@@ -347,9 +347,9 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
     const csvFilePath = req.file.path;
     const newContacts = await readContactsFromCSV(csvFilePath);
     
-    console.log('Uploaded contacts before normalization:', newContacts);
+    // console.log('Uploaded contacts before normalization:', newContacts);
     
-    console.log('Normalized contacts:', newContacts);
+    // console.log('Normalized contacts:', newContacts);
     
     // Make sure the contacts file exists before trying to read from it
     let existingContacts = [];
@@ -369,7 +369,7 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
     // Combine existing contacts with unique new contacts
     const updatedContacts = [...existingContacts, ...uniqueNewContacts];
     
-    console.log('Final contacts to write:', updatedContacts);
+    // console.log('Final contacts to write:', updatedContacts);
     
     // Write the updated contacts back to the Excel file
     writeContactsToExcel(CONTACTS_FILE, updatedContacts);
@@ -387,7 +387,7 @@ app.post('/bot/numbers', upload.single('file'), async (req, res) => {
       repeatedContacts:repeatedContacts.length
     });
   } catch (error) {
-    console.error(error);
+    // console.error(error);
     // Clean up the uploaded file if it exists
     if (req.file && existsSync(req.file.path)) {
       unlinkSync(req.file.path);
@@ -415,7 +415,7 @@ app.post('/bot/media', mediaMiddleware, async (req, res) => {
         message: 'Media was not received'
       });
     }
-    console.log('media recieved')
+    // console.log('media recieved')
     // Create media directory if it doesn't exist
     const mediaDir = path.join(__dirname, 'assets');
     await ensureDirectoryExists(mediaDir);
@@ -431,9 +431,9 @@ app.post('/bot/media', mediaMiddleware, async (req, res) => {
       message: 'Media uploaded successfully',
       path: newFilePath
     });
-    console.log('upload of photo success')
+    // console.log('upload of photo success')
   } catch (error) {
-    console.error('Error handling media upload:', error);
+    // console.error('Error handling media upload:', error);
     // Clean up the uploaded file if it exists
     if (req.files && req.files['media'] && req.files['media'][0] && existsSync(req.files['media'][0].path)) {
       unlinkSync(req.files['media'][0].path);
@@ -474,15 +474,9 @@ app.post('/bot/salutations', async (req, res) => {
 });
 
 app.post('/bot/start', async (req, res) => {
-  
-      // const contacts = readContactsFromExcel(CONTACTS_FILE);
-      // const unsentContacts = contacts.filter(contact => !contact.sent);
-      // console.log('this is contacts',unsentContacts)
-console.log(req.body)
+
   try {
     const { option, useImage } = req.body;
-
-    console.log('the use image ooption is set as' , useImage)
 
     if (option !== 'start' && useImage == false) {
       return res.status(403).json({
@@ -501,9 +495,9 @@ console.log(req.body)
     }
 
     const contacts = readContactsFromExcel(CONTACTS_FILE);
-    console.log('the contacts fetched are' , contacts)
+    // console.log('the contacts fetched are' , contacts)
     const unsentContacts = contacts.filter(contact => !contact.sent);
-    console.log('the unsentcontacts fetched are' , unsentContacts)
+    // console.log('the unsentcontacts fetched are' , unsentContacts)
 
     if (unsentContacts.length === 0) {
       return res.status(200).json({
@@ -548,7 +542,7 @@ console.log(req.body)
         if (!existsSync(mediaPath)) {
           await ensureDirectoryExists(path.join(__dirname, 'assets'));
           // This would be better handled by having a default image
-          console.log('No default banner found.');
+          // console.log('No default banner found.');
         }
       }
     } catch (err) {
@@ -567,14 +561,14 @@ console.log(req.body)
       chatId = chatId + '@c.us';
       let salutation = contact.name;
       if(salutation == 'NULL'){
-        console.log('null found' , contact.phone)
+        // console.log('null found' , contact.phone)
         salutation = messageData.salutation;
-        console.log('updated salutaions ->' , salutation)
+        // console.log('updated salutaions ->' , salutation)
       }
       // salutation = contact.name;
       const text = messageData.message || '';
       const caption =  salutation + ' ' + text;
-      console.log(caption)
+      // console.log(caption)
       try {
         // if (existsSync(mediaPath)) {
         //   const media = MessageMedia.fromFilePath(mediaPath);
@@ -596,11 +590,11 @@ console.log(req.body)
             message:'No poster found to be used first upload a poster please'
           })
         }
-          console.log('sent media message')
+          // console.log('sent media message')
           await client.sendMessage(chatId, media, { caption });
         } else {
           // Send text only if no media is available or it's a hidden file
-          console.log('sent text message')
+          // console.log('sent text message')
           await client.sendMessage(chatId, caption);
         }
         

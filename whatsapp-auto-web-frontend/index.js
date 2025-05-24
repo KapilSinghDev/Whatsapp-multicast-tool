@@ -196,7 +196,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        contacts: contacts,  // Fixed: was 'contact', should be 'contacts'
+                        contacts: contacts, 
                         media: media
                     })
                 });
