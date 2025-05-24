@@ -16,8 +16,11 @@
         const message = document.getElementById('message');
         const saveMessageBtn = document.getElementById('saveMessageBtn');
         const startCampaignBtn = document.getElementById('startCampaignBtn');
+        const startImageCampaignBtn = document.getElementById('startPosterCampaignBtn')
         const logs = document.getElementById('logs');
-
+        const selectContacts = document.getElementById('contacts-x')
+        const selectMedia = document.getElementById('media-x')
+        const goButton = document.getElementById('executeActions')
         // Base URL for API calls
         const API_BASE_URL = 'http://localhost:3000';
 
@@ -42,6 +45,10 @@
             uploadMediaBtn.addEventListener('click', uploadMedia);
             saveMessageBtn.addEventListener('click', saveMessageSettings);
             startCampaignBtn.addEventListener('click', startCampaign);
+            startImageCampaignBtn.addEventListener('click',startCaptionWithImage)
+            selectContacts.addEventListener('click', (e) => clearAssets(e)) // ✅ Use arrow function
+            selectMedia.addEventListener('click', (e) => clearAssets(e))    // ✅ Use arrow function
+            goButton.addEventListener('click',deleteAction)
         });
 
         // Add log entry
@@ -168,6 +175,59 @@
             }
         }
 
+        // remove contacts and media
+
+        let contacts = false;
+        let media = false;
+        async function clearAssets(e) {
+            console.log(e.target.id)
+            if(e.target.id === 'contacts-x'){
+                contacts = !contacts;
+            }
+            if(e.target.id === 'media-x'){
+                media = !media
+            }
+        }
+        async function deleteAction() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/bot/clear`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contacts: contacts,  // Fixed: was 'contact', should be 'contacts'
+                        media: media
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 200) {
+                    addLog(`Delete Status: Contacts: ${data.results.contactsCleared ? 'Cleared' : 'Not processed'}, Media: ${data.results.mediaDeleted ? 'Deleted' : 'Not processed'}`);
+                    
+                    // Add individual messages from the server
+                    if (data.results.messages && data.results.messages.length > 0) {
+                        data.results.messages.forEach(message => {
+                            addLog(`- ${message}`);
+                        });
+                    }
+                } else {
+                    addLog(`Error Deleting Files: ${data.message || 'Unknown error'}`);
+                    
+                    // Add error details if available
+                    if (data.results && data.results.messages) {
+                        data.results.messages.forEach(message => {
+                            addLog(`- ${message}`);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error in deleteAction:', error);
+                addLog(`Network Error: ${error.message}`);
+            }
+        }
+
         // Upload media file
         async function uploadMedia() {
             if (!mediaFile.files[0]) {
@@ -267,7 +327,44 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ option: 'start' })
+                    body: JSON.stringify({ option: 'start' , useImage : false })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 200) {
+                    addLog(`Campaign completed! Sent ${data.totalMessagesSent} messages successfully.`, 'success');
+                    
+                    if (data.totalMessagesFailed > 0) {
+                        addLog(`Failed to send ${data.totalMessagesFailed} messages.`, 'error');
+                    }
+                } else {
+                    addLog(`Campaign failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error starting campaign:', error);
+                addLog('Error starting campaign.', 'error');
+            }
+        }
+
+        async function startCaptionWithImage() {
+            try {
+                // First check if WhatsApp is connected
+                const statusResponse = await fetch(`${API_BASE_URL}/bot/status`);
+                const statusData = await statusResponse.json();
+                
+                if (statusData.status !== 'connected') {
+                    addLog('WhatsApp is not connected. Please connect first.', 'error');
+                    return;
+                }
+                
+                addLog('Starting campaign...', 'info');
+                const response = await fetch(`${API_BASE_URL}/bot/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ option: 'start' , useImage : true })
                 });
                 
                 const data = await response.json();

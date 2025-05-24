@@ -56,6 +56,28 @@
                 <button id="uploadMediaBtn">Upload Media</button>
             </div>
 
+            <div class="btn-dashboard">
+                <div class="checkbox-item">
+                    <label class="custom-checkbox">
+                        <input type="checkbox" id="contacts-x">
+                        <span class="checkmark"></span>
+                    </label>
+                    <label for="markContacts" class="checkbox-label">Mark Contacts False</label>
+                </div>
+                
+                <div class="checkbox-item">
+                    <label class="custom-checkbox">
+                        <input type="checkbox" id="media-x">
+                        <span class="checkmark"></span>
+                    </label>
+                    <label for="deleteMedia" class="checkbox-label">Delete Media</label>
+                </div>
+                
+                <button class="go-button" id="executeActions">
+                    <span>GO</span>
+                </button>
+            </div>
+
             <div class="card full-width">
                 <h2>Message Settings</h2>
                 <div class="form-group">
@@ -73,7 +95,8 @@
                 <h2>Campaign Control</h2>
                 <p>Start sending messages to all uploaded contacts</p>
                 <div class="row">
-                    <button id="startCampaignBtn" class="success">Start Campaign</button>
+                    <button id="startCampaignBtn" class="success">Start Text Campaign</button>
+                    <button id="startPosterCampaignBtn" class="success">Start Image Campaign</button>
                 </div>
                 <div class="logs" id="logs">
                     <div class="log-entry info">System ready. Connect WhatsApp to begin.</div>

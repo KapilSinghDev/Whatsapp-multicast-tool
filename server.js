@@ -478,11 +478,13 @@ app.post('/bot/start', async (req, res) => {
       // const contacts = readContactsFromExcel(CONTACTS_FILE);
       // const unsentContacts = contacts.filter(contact => !contact.sent);
       // console.log('this is contacts',unsentContacts)
-
+console.log(req.body)
   try {
-    const { option } = req.body;
-    
-    if (option !== 'start') {
+    const { option, useImage } = req.body;
+
+    console.log('the use image ooption is set as' , useImage)
+
+    if (option !== 'start' && useImage == false) {
       return res.status(403).json({
         status: 403,
         message: 'Not permitted to start',
@@ -571,7 +573,7 @@ app.post('/bot/start', async (req, res) => {
       }
       // salutation = contact.name;
       const text = messageData.message || '';
-      const caption = 'Hello ' + salutation + ' ' + text;
+      const caption =  salutation + ' ' + text;
       console.log(caption)
       try {
         // if (existsSync(mediaPath)) {
@@ -583,11 +585,22 @@ app.post('/bot/start', async (req, res) => {
         // }
         const isHiddenFile = filePath => path.basename(filePath).startsWith('.');
 
-        if (!isHiddenFile(mediaPath) && existsSync(mediaPath)) {
+        
+        if (!isHiddenFile(mediaPath) && existsSync(mediaPath) && useImage === true) {
           const media = MessageMedia.fromFilePath(mediaPath);
+
+          // if image option is enabled and no image is found to be used
+        if(!media){
+          res.status(500).json(500)({
+            status:500,
+            message:'No poster found to be used first upload a poster please'
+          })
+        }
+          console.log('sent media message')
           await client.sendMessage(chatId, media, { caption });
         } else {
           // Send text only if no media is available or it's a hidden file
+          console.log('sent text message')
           await client.sendMessage(chatId, caption);
         }
         
@@ -616,6 +629,77 @@ app.post('/bot/start', async (req, res) => {
       status: 500,
       message: 'Failed to send messages',
       error: error.message,
+    });
+  }
+});
+
+
+app.post('/bot/clear', async (req, res) => {
+  try {
+    const { contacts, media } = req.body;
+    let results = {
+      contactsCleared: false,
+      mediaDeleted: false,
+      messages: []
+    };
+
+    // Mark all contacts as false (unsent)
+    if (contacts === true) {
+      try {
+        // Mark all contacts as unsent (sent: false)
+        const existingContacts = readContactsFromExcel(CONTACTS_FILE);
+        updateContactStatusInExcel(CONTACTS_FILE, existingContacts,false);
+        results.contactsCleared = true;
+        results.messages.push('All contacts marked as unsent');
+        console.log('All contacts marked as unsent');
+      } catch (error) {
+        results.messages.push('Error clearing contacts: ' + error.message);
+        console.error('Error clearing contacts:', error.message);
+      }
+    }
+
+    // Delete media file when media is true (not false)
+    if (media === true) {
+      try {
+        const assetsDir = path.join(__dirname, 'assets');
+        const files = await fs.readdir(assetsDir);
+        
+        if (files.length > 0) {
+          // Delete all files in assets directory
+          for (const file of files) {
+            const filePath = path.join(assetsDir, file);
+            await fs.unlink(filePath);
+            console.log(`${file} deleted successfully`);
+          }
+          results.mediaDeleted = true;
+          results.messages.push('All media files deleted from assets directory');
+        } else {
+          results.messages.push('No media files found to delete');
+        }
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          results.messages.push('Assets directory not found');
+          console.log('Assets directory not found');
+        } else {
+          results.messages.push('Error deleting media: ' + error.message);
+          console.error('Error deleting media:', error.message);
+        }
+      }
+    }
+
+    // Send response
+    res.status(200).json({
+      status: 200,
+      message: 'Clear operation completed',
+      results: results
+    });
+
+  } catch (error) {
+    console.error('Error in /bot/clear:', error);
+    res.status(500).json({
+      status: 500,
+      message: 'Failed to clear data',
+      error: error.message
     });
   }
 });
