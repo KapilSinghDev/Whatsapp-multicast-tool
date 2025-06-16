@@ -37,6 +37,7 @@ assets/
 # Contact files
 contacts.xlsx
 contacts.csv
+number.csv
 
 # WhatsApp Web.js session files
 .wwebjs_auth/

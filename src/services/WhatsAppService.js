@@ -81,41 +81,66 @@ export class WhatsAppService {
     return this.client;
   }
 
-  async generateQRCode(res) {
-    try {
-      // Clean up existing client if it exists but isn't ready
-      if (this.client && !this.clientReady) {
-        await this.client.destroy();
-        this.client = null;
-        this.isInitializing = false;
-      }
-      
-      // Initialize a new client
-      this.client = new Client({
-        authStrategy: new LocalAuth(),
-        puppeteer: {
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-          ]
+async generateQRCode(res) {
+  let qrSent = false; // Prevent multiple res.send()
+  let timeoutId = null;
+
+  try {
+    // Clean up existing client if it exists
+    if (this.client) {
+      try {
+        // Check if client has pupPage before calling destroy
+        if (this.client.pupPage || this.client.info) {
+          await this.client.destroy();
         }
-      });
-      
-      let qrSent = false; // prevent multiple res.send()
-      
-      this.client.on('qr', async (qr) => {
-        if (qrSent) return;
+      } catch (destroyError) {
+        console.warn('Error destroying existing client:', destroyError);
+        // Continue anyway - don't let destroy errors block new client creation
+      }
+      this.client = null;
+      this.clientReady = false;
+      this.isInitializing = false;
+    }
+
+    // Set timeout early to ensure it's always set
+    timeoutId = setTimeout(() => {
+      if (!res.headersSent && !qrSent) {
+        qrSent = true;
+        res.status(500).send('Timeout waiting for WhatsApp events');
+      }
+    }, 60000);
+
+    // Initialize a new client
+    this.client = new Client({
+      authStrategy: new LocalAuth(),
+      puppeteer: {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ]
+      }
+    });
+
+    // Set up event handlers BEFORE initializing
+    this.client.on('qr', async (qr) => {
+      if (qrSent) return;
+
+      try {
+        console.log('QR Code received');
+        const qrImageUrl = await qrcode.toDataURL(qr);
         
-        try {
-          console.log('QR Code received');
-          const qrImageUrl = await qrcode.toDataURL(qr);
+        if (!res.headersSent) {
           qrSent = true;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
           
           res.status(200).send(`
             <html>
@@ -129,67 +154,103 @@ export class WhatsAppService {
               </body>
             </html>
           `);
-        } catch (err) {
-          console.error('Error generating QR code image:', err);
-          if (!qrSent) {
-            qrSent = true;
-            res.status(500).send('Failed to generate QR code: ' + err.message);
+        }
+      } catch (err) {
+        console.error('Error generating QR code image:', err);
+        if (!res.headersSent && !qrSent) {
+          qrSent = true;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
           }
+          res.status(500).send('Failed to generate QR code: ' + err.message);
         }
-      });
-      
-      this.client.on('ready', () => {
-        console.log('WhatsApp client is ready!');
-        this.clientReady = true;
-        if (!qrSent) {
-          qrSent = true;
-          res.status(200).send(`
-            <html>
-              <body style="text-align: center; font-family: Arial, sans-serif;">
-                <h2>WhatsApp is already authenticated!</h2>
-                <p>Your WhatsApp bot is ready to use.</p>
-                <a href="/bot/status">Check Status</a>
-              </body>
-            </html>
-          `);
-        }
-      });
-      
-      this.client.on('authenticated', () => {
-        console.log('WhatsApp client is authenticated!');
-      });
-      
-      this.client.on('auth_failure', (err) => {
-        console.error('WhatsApp authentication failed:', err);
-        if (!qrSent) {
-          qrSent = true;
-          res.status(500).send('Authentication failed: ' + err.message);
-        }
-      });
-
-      this.client.on('disconnected', (reason) => {
-        console.log('WhatsApp client disconnected during QR generation:', reason);
-        this.clientReady = false;
-        this.client = null;
-      });
-      
-      // Start the client
-      await this.client.initialize();
-      
-    } catch (err) {
-      console.error('Failed to initialize WhatsApp client for QR:', err);
-      if (!res.headersSent) {
-        res.status(500).send('Failed to initialize WhatsApp client: ' + err.message);
       }
+    });
+
+    this.client.on('ready', () => {
+      console.log('WhatsApp client is ready!');
+      this.clientReady = true;
+      
+      if (!res.headersSent && !qrSent) {
+        qrSent = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        
+        res.status(200).send(`
+          <html>
+            <body style="text-align: center; font-family: Arial, sans-serif;">
+              <h2>WhatsApp is already authenticated!</h2>
+              <p>Your WhatsApp bot is ready to use.</p>
+              <a href="/bot/status">Check Status</a>
+            </body>
+          </html>
+        `);
+      }
+    });
+
+    this.client.on('authenticated', () => {
+      console.log('WhatsApp client is authenticated!');
+    });
+
+    this.client.on('auth_failure', (err) => {
+      console.error('WhatsApp authentication failed:', err);
+      
+      if (!res.headersSent && !qrSent) {
+        qrSent = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        res.status(500).send('Authentication failed: ' + err.message);
+      }
+    });
+
+    this.client.on('disconnected', (reason) => {
+      console.log('WhatsApp client disconnected during QR generation:', reason);
+      this.clientReady = false;
+      // Don't set client to null here as it might be used elsewhere
+    });
+
+    // Add error handler for client initialization errors
+    this.client.on('error', (error) => {
+      console.error('WhatsApp client error:', error);
+      
+      if (!res.headersSent && !qrSent) {
+        qrSent = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        res.status(500).send('WhatsApp client error: ' + error.message);
+      }
+    });
+
+    // Start the client initialization
+    this.isInitializing = true;
+    await this.client.initialize();
+
+  } catch (err) {
+    console.error('Failed to initialize WhatsApp client for QR:', err);
+    
+    // Clean up timeout if it exists
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
     }
     
-    // Set timeout in case no events are triggered
-    setTimeout(() => {
-      if (!res.headersSent) {
-        res.status(500).send('Timeout waiting for WhatsApp events');
-      }
-    }, 60000); // Increased timeout to 60 seconds
+    // Reset state
+    this.clientReady = false;
+    this.isInitializing = false;
+    
+    if (!res.headersSent && !qrSent) {
+      qrSent = true;
+      res.status(500).send('Failed to initialize WhatsApp client: ' + err.message);
+    }
   }
+}
 
   isClientReady() {
     return this.client && this.clientReady;
