@@ -152,7 +152,7 @@ export class ContactService {
     this.writeContactsToExcel(updatedContacts);
     
     // Mark reappeared numbers as true
-    this.updateContactStatusInExcel(repeatedContacts, true);
+    this.updateContactStatusInExcel(repeatedContacts, false);
 
     return {
       newContactsAdded: uniqueNewContacts.length,
