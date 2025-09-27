@@ -18,7 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = 3000 || env.port;
+const port = process.env.PORT || 3000;
 
 // Initialize services
 const whatsappService = new WhatsAppService();
