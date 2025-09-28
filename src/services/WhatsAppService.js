@@ -105,20 +105,20 @@ export class WhatsAppService {
 
     try {
       // Clean up existing client if it exists
-      // if (this.client) {
-      //   try {
-      //     // Check if client has pupPage before calling destroy
-      //     if (this.client.pupPage || this.client.info) {
-      //       await this.client.destroy();
-      //     }
-      //   } catch (destroyError) {
-      //     console.warn("Error destroying existing client:", destroyError);
-      //     // Continue anyway - don't let destroy errors block new client creation
-      //   }
-      //   this.client = null;
-      //   this.clientReady = false;
-      //   this.isInitializing = false;
-      // }
+      if (this.client) {
+        try {
+          // Check if client has pupPage before calling destroy
+          if (this.client.pupPage || this.client.info) {
+            await this.client.destroy();
+          }
+        } catch (destroyError) {
+          console.warn("Error destroying existing client:", destroyError);
+          // Continue anyway - don't let destroy errors block new client creation
+        }
+        this.client = null;
+        this.clientReady = false;
+        this.isInitializing = false;
+      }
 
       // Set timeout early to ensure it's always set
       timeoutId = setTimeout(() => {
