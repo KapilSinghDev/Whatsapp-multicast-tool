@@ -1,4 +1,9 @@
 // DOM Elements
+const loginContainer = document.getElementById("loginContainer");
+const mainContainer = document.getElementById("mainContainer");
+const userIdInput = document.getElementById("userIdInput");
+const loginBtn = document.getElementById("loginBtn");
+const userIdDisplay = document.getElementById("userIdDisplay");
 const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
 const connectBtn = document.getElementById("connectBtn");
@@ -20,13 +25,21 @@ const logs = document.getElementById("logs");
 const selectContacts = document.getElementById("contacts-x");
 const selectMedia = document.getElementById("media-x");
 const goButton = document.getElementById("executeActions");
+
 // Base URL for API calls
-const API_BASE_URL = "http://localhost:3000";
+const BASE_URL = "http://localhost:3000";
 
 // Initialize app
 document.addEventListener("DOMContentLoaded", () => {
-  checkStatus();
-  loadMessageSettings();
+  const userId = sessionStorage.getItem("userId");
+  if (userId && userId >= 1 && userId <= 10) {
+    showMainContainer(userId);
+    checkStatus();
+    loadMessageSettings();
+  } else {
+    loginContainer.style.display = "block";
+    mainContainer.style.display = "none";
+  }
 
   // Set up file input listeners
   contactsFile.addEventListener("change", () => {
@@ -39,6 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Button event listeners
+  loginBtn.addEventListener("click", login);
   connectBtn.addEventListener("click", connectWhatsApp);
   logoutBtn.addEventListener("click", logoutWhatsApp);
   uploadContactsBtn.addEventListener("click", uploadContacts);
@@ -46,10 +60,37 @@ document.addEventListener("DOMContentLoaded", () => {
   saveMessageBtn.addEventListener("click", saveMessageSettings);
   startCampaignBtn.addEventListener("click", startCampaign);
   startImageCampaignBtn.addEventListener("click", startCaptionWithImage);
-  selectContacts.addEventListener("click", (e) => clearAssets(e)); // ✅ Use arrow function
-  selectMedia.addEventListener("click", (e) => clearAssets(e)); // ✅ Use arrow function
+  selectContacts.addEventListener("click", clearAssets);
+  selectMedia.addEventListener("click", clearAssets);
   goButton.addEventListener("click", deleteAction);
 });
+
+// Get user-specific API base URL
+function getApiBaseUrl() {
+  const userId = sessionStorage.getItem("userId");
+  return `${BASE_URL}/bot/${userId}`;
+}
+
+// Login function
+function login() {
+  const userId = parseInt(userIdInput.value);
+  if (isNaN(userId) || userId < 1 || userId > 10) {
+    addLog("Please enter a valid user ID (1-10).", "error");
+    return;
+  }
+
+  sessionStorage.setItem("userId", userId);
+  showMainContainer(userId);
+  checkStatus();
+  loadMessageSettings();
+}
+
+// Show main container and update user ID display
+function showMainContainer(userId) {
+  loginContainer.style.display = "none";
+  mainContainer.style.display = "block";
+  userIdDisplay.textContent = userId;
+}
 
 // Add log entry
 function addLog(message, type = "info") {
@@ -62,7 +103,7 @@ function addLog(message, type = "info") {
 // Check WhatsApp connection status
 async function checkStatus() {
   try {
-    const response = await fetch(`${API_BASE_URL}/bot/status`);
+    const response = await fetch(`${getApiBaseUrl()}/status`);
     const data = await response.json();
 
     if (data.status === "connected") {
@@ -92,7 +133,7 @@ function connectWhatsApp() {
   iframe.width = "100%";
   iframe.height = "300px";
   iframe.style.border = "none";
-  iframe.src = `${API_BASE_URL}/bot/qr`;
+  iframe.src = `${getApiBaseUrl()}/qr`;
 
   qrCode.innerHTML = "";
   qrCode.appendChild(iframe);
@@ -100,7 +141,7 @@ function connectWhatsApp() {
   // Poll for status after showing QR
   const statusInterval = setInterval(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/bot/status`);
+      const response = await fetch(`${getApiBaseUrl()}/status`);
       const data = await response.json();
 
       if (data.status === "connected") {
@@ -120,7 +161,7 @@ function connectWhatsApp() {
 async function logoutWhatsApp() {
   try {
     addLog("Logging out from WhatsApp...", "info");
-    const response = await fetch(`${API_BASE_URL}/bot/logout`, {
+    const response = await fetch(`${getApiBaseUrl()}/logout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -131,19 +172,22 @@ async function logoutWhatsApp() {
     const data = await response.json();
 
     if (data.status === 200) {
+      addLog("Logged out successfully.", "success");
       statusDot.classList.remove("connected");
       statusText.textContent = "Disconnected";
-      addLog("Logged out successfully.", "success");
+      sessionStorage.removeItem("userId");
+      loginContainer.style.display = "block";
+      mainContainer.style.display = "none";
     } else {
       addLog(`Logout failed: ${data.message}`, "error");
     }
   } catch (error) {
     console.error("Error during logout:", error);
-    addLog("Error during logout.", "error");
+    addLog("Error logging out.", "error");
   }
 }
 
-// Upload contacts CSV file
+// Upload contacts
 async function uploadContacts() {
   if (!contactsFile.files[0]) {
     addLog("Please select a CSV file first.", "error");
@@ -155,7 +199,7 @@ async function uploadContacts() {
 
   try {
     addLog("Uploading contacts...", "info");
-    const response = await fetch(`${API_BASE_URL}/bot/numbers`, {
+    const response = await fetch(`${getApiBaseUrl()}/numbers`, {
       method: "POST",
       body: formData,
     });
@@ -164,13 +208,16 @@ async function uploadContacts() {
 
     if (data.status === 200) {
       addLog(
-        `Successful. ${data.newContactsAdded} new contacts and ${data.repeatedContacts} were repeats`,
+        `Contacts uploaded successfully. Added ${data.newContactsAdded} new contacts.`,
         "success"
       );
-      contactsFileName.textContent = "No file chosen";
+      if (data.repeatedContacts > 0) {
+        addLog(`${data.repeatedContacts} contacts were duplicates.`, "info");
+      }
       contactsFile.value = "";
+      contactsFileName.textContent = "No file chosen";
     } else {
-      addLog(`Upload failed: ${data.message}`, "error");
+      addLog(`Failed to upload contacts: ${data.message}`, "error");
     }
   } catch (error) {
     console.error("Error uploading contacts:", error);
@@ -178,64 +225,7 @@ async function uploadContacts() {
   }
 }
 
-// remove contacts and media
-
-let contacts = false;
-let media = false;
-async function clearAssets(e) {
-  console.log(e.target.id);
-  if (e.target.id === "contacts-x") {
-    contacts = !contacts;
-  }
-  if (e.target.id === "media-x") {
-    media = !media;
-  }
-}
-async function deleteAction() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/bot/clear`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contacts: contacts,
-        media: media,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (data.status === 200) {
-      addLog(
-        `Delete Status: Contacts: ${
-          data.results.contactsCleared ? "Cleared" : "Not processed"
-        }, Media: ${data.results.mediaDeleted ? "Deleted" : "Not processed"}`
-      );
-
-      // Add individual messages from the server
-      if (data.results.messages && data.results.messages.length > 0) {
-        data.results.messages.forEach((message) => {
-          addLog(`- ${message}`);
-        });
-      }
-    } else {
-      addLog(`Error Deleting Files: ${data.message || "Unknown error"}`);
-
-      // Add error details if available
-      if (data.results && data.results.messages) {
-        data.results.messages.forEach((message) => {
-          addLog(`- ${message}`);
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error in deleteAction:", error);
-    addLog(`Network Error: ${error.message}`);
-  }
-}
-
-// Upload media file
+// Upload media
 async function uploadMedia() {
   if (!mediaFile.files[0]) {
     addLog("Please select a media file first.", "error");
@@ -247,7 +237,7 @@ async function uploadMedia() {
 
   try {
     addLog("Uploading media...", "info");
-    const response = await fetch(`${API_BASE_URL}/bot/media`, {
+    const response = await fetch(`${getApiBaseUrl()}/media`, {
       method: "POST",
       body: formData,
     });
@@ -256,10 +246,10 @@ async function uploadMedia() {
 
     if (data.status === 200) {
       addLog("Media uploaded successfully.", "success");
-      mediaFileName.textContent = "No file chosen";
       mediaFile.value = "";
+      mediaFileName.textContent = "No file chosen";
     } else {
-      addLog(`Media upload failed: ${data.message}`, "error");
+      addLog(`Failed to upload media: ${data.message}`, "error");
     }
   } catch (error) {
     console.error("Error uploading media:", error);
@@ -267,20 +257,11 @@ async function uploadMedia() {
   }
 }
 
-// Load message settings
+// Load message settings (placeholder since no endpoint exists)
 async function loadMessageSettings() {
-  try {
-    // This is a workaround since we don't have a direct endpoint
-    // to get the current message settings
-    const response = await fetch(`${API_BASE_URL}/`);
-
-    // If we had an endpoint to get message settings, we'd use it like:
-    // const messageData = await response.json();
-    // salutation.value = messageData.salutation || '';
-    // message.value = messageData.message || '';
-  } catch (error) {
-    console.error("Error loading message settings:", error);
-  }
+  // Note: No endpoint to load message settings currently exists
+  salutation.value = "";
+  message.value = "";
 }
 
 // Save message settings
@@ -292,7 +273,7 @@ async function saveMessageSettings() {
 
   try {
     addLog("Saving message settings...", "info");
-    const response = await fetch(`${API_BASE_URL}/bot/salutations`, {
+    const response = await fetch(`${getApiBaseUrl()}/salutations`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -316,47 +297,11 @@ async function saveMessageSettings() {
   }
 }
 
-// Start the campaign
-// async function startCampaign() {
-//     try {
-//         // First check if WhatsApp is connected
-//         const statusResponse = await fetch(`${API_BASE_URL}/bot/status`);
-//         const statusData = await statusResponse.json();
-
-//         if (statusData.status !== 'connected') {
-//             addLog('WhatsApp is not connected. Please connect first.', 'error');
-//             return;
-//         }
-
-//         addLog('Starting campaign...', 'info');
-//         const response = await fetch(`${API_BASE_URL}/bot/start`, {
-//             method: 'POST',
-//             headers: {
-//                 'Content-Type': 'application/json'
-//             },
-//             body: JSON.stringify({ option: 'start' , useImage : false })
-//         });
-
-//         const data = await response.json();
-
-//         if (data.status === 200) {
-//             addLog(`Campaign completed! Sent ${data.totalMessagesSent} messages successfully.`, 'success');
-
-//             if (data.totalMessagesFailed > 0) {
-//                 addLog(`Failed to send ${data.totalMessagesFailed} messages.`, 'error');
-//             }
-//         } else {
-//             addLog(`Campaign failed: ${data.message}`, 'error');
-//         }
-//     } catch (error) {
-//         console.error('Error starting campaign:', error);
-//         addLog('Error starting campaign.', 'error');
-//     }
-// }
+// Start text campaign
 async function startCampaign() {
   try {
-    addLog("Starting campaign...", "info");
-    const response = await fetch(`${API_BASE_URL}/bot/start`, {
+    addLog("Starting text campaign...", "info");
+    const response = await fetch(`${getApiBaseUrl()}/start`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -371,7 +316,6 @@ async function startCampaign() {
         `Campaign completed! Sent ${data.totalMessagesSent} messages successfully.`,
         "success"
       );
-
       if (data.totalMessagesFailed > 0) {
         addLog(`Failed to send ${data.totalMessagesFailed} messages.`, "error");
       }
@@ -386,19 +330,11 @@ async function startCampaign() {
   }
 }
 
+// Start image campaign
 async function startCaptionWithImage() {
   try {
-    // First check if WhatsApp is connected
-    const statusResponse = await fetch(`${API_BASE_URL}/bot/status`);
-    const statusData = await statusResponse.json();
-
-    if (statusData.status !== "connected") {
-      addLog("WhatsApp is not connected. Please connect first.", "error");
-      return;
-    }
-
-    addLog("Starting campaign...", "info");
-    const response = await fetch(`${API_BASE_URL}/bot/start`, {
+    addLog("Starting image campaign...", "info");
+    const response = await fetch(`${getApiBaseUrl()}/start`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -413,15 +349,63 @@ async function startCaptionWithImage() {
         `Campaign completed! Sent ${data.totalMessagesSent} messages successfully.`,
         "success"
       );
-
       if (data.totalMessagesFailed > 0) {
         addLog(`Failed to send ${data.totalMessagesFailed} messages.`, "error");
       }
+    } else if (data.status === 400 && data.message.includes("not ready")) {
+      addLog("WhatsApp is not connected. Please connect first.", "error");
     } else {
       addLog(`Campaign failed: ${data.message}`, "error");
     }
   } catch (error) {
     console.error("Error starting campaign:", error);
     addLog("Error starting campaign.", "error");
+  }
+}
+
+// Clear assets (contacts or media)
+function clearAssets(e) {
+  // No API call needed here; just toggle checkbox state
+  // Actual action is triggered by deleteAction
+}
+
+// Delete selected assets
+async function deleteAction() {
+  const contacts = selectContacts.checked;
+  const media = selectMedia.checked;
+
+  if (!contacts && !media) {
+    addLog("Please select at least one action (contacts or media).", "error");
+    return;
+  }
+
+  try {
+    addLog("Performing clear actions...", "info");
+    const response = await fetch(`${getApiBaseUrl()}/clear`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ contacts, media }),
+    });
+
+    const data = await response.json();
+
+    if (data.status === 200) {
+      if (data.results.contactsCleared) {
+        addLog("Contacts marked as unsent.", "success");
+      }
+      if (data.results.mediaDeleted) {
+        addLog("Media files deleted.", "success");
+      }
+      data.results.messages.forEach((msg) => addLog(msg, "info"));
+      selectContacts.checked = false;
+      selectMedia.checked = false;
+    } else {
+      addLog(`Clear action failed: ${data.message}`, "error");
+    }
+  } catch (error) {
+    console.error("Error performing clear action:", error);
+    addLog("Error performing clear action.", "error");
   }
 }

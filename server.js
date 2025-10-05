@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -11,14 +10,14 @@ import { createUploadMiddleware } from "./src/middleware/upload.js";
 import whatsappRoutes from "./src/routes/whatsappRoutes.js";
 import { WhatsAppService } from "./src/services/WhatsAppService.js";
 import { ContactService } from "./src/services/ContactService.js";
-import { MessageService } from "./src/utils/messageUtils.js";
+import { WhatsAppController } from "./src/controllers/WhatsAppController.js";
 
 // Setup __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 3000; // Fixed: was using undefined 'env'
+const port = process.env.PORT || 3000;
 
 // Prevent multiple signal listeners (fixes PM2 memory leak warnings)
 process.setMaxListeners(20);
@@ -27,44 +26,74 @@ process.removeAllListeners("SIGTERM");
 process.removeAllListeners("SIGHUP");
 process.removeAllListeners("exit");
 
-// Initialize services
-const whatsappService = new WhatsAppService();
-const contactService = new ContactService(__dirname);
-const messageService = new MessageService(); // Fixed: missing semicolon
+const MAX_USERS = 10;
+const userData = new Map();
+
+async function initializeUsers() {
+  const dataDir = path.join(__dirname, "data");
+  await ensureDirectoryExists(dataDir);
+
+  for (let i = 1; i <= MAX_USERS; i++) {
+    const userId = i;
+    const userDir = path.join(dataDir, `user${userId}`);
+    await ensureDirectoryExists(userDir);
+    await ensureDirectoryExists(path.join(userDir, "message"));
+
+    // Initialize message file for this user
+    await initializeMessageFile(userDir);
+
+    const contactService = new ContactService(userDir);
+    await contactService.initializeContactsFile();
+
+    const whatsappService = new WhatsAppService(userDir, userId);
+
+    const controller = new WhatsAppController(whatsappService, contactService);
+
+    userData.set(userId, { whatsappService, contactService, controller });
+  }
+}
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
+// Routes with userId
 app.use(
-  "/bot",
-  whatsappRoutes(
-    whatsappService,
-    contactService,
-    messageService,
-    createUploadMiddleware()
-  )
+  "/bot/:userId",
+  (req, res, next) => {
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId) || userId < 1 || userId > MAX_USERS) {
+      return res.status(400).json({ error: "Invalid userId (1-10)" });
+    }
+    req.userId = userId;
+    next();
+  },
+  whatsappRoutes(createUploadMiddleware(), userData)
 );
 
-// Root route
+// Root route (aggregate status for all users)
 app.get("/", (req, res) => {
   try {
-    const status = whatsappService.getStatus();
+    const statuses = {};
+    for (let i = 1; i <= MAX_USERS; i++) {
+      const { whatsappService } = userData.get(i);
+      const status = whatsappService.getStatus();
+      statuses[`user${i}`] = {
+        connected: status.status === "connected",
+        clientInitialized: status.client === "initialized",
+      };
+    }
     res.status(200).json({
-      connected: status.status === "connected",
-      clientInitialized: status.client === "initialized",
-      message:
-        "WhatsApp Bot Server is running. Visit /bot/qr to generate QR code.",
-      pid: process.pid, // Helpful for PM2 debugging
+      message: "Multi-user WhatsApp Bot Server is running.",
+      statuses,
+      pid: process.pid,
       uptime: process.uptime(),
     });
   } catch (error) {
-    console.error("Error checking status:", error);
+    console.error("Error checking statuses:", error);
     res.status(500).json({
-      connected: false,
-      error: "Failed to check WhatsApp status",
+      error: "Failed to check WhatsApp statuses",
     });
   }
 });
@@ -88,7 +117,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Graceful shutdown handlers (use 'once' to prevent multiple listeners)
+// Graceful shutdown handlers
 let isShuttingDown = false;
 
 const gracefulShutdown = async (signal) => {
@@ -101,10 +130,14 @@ const gracefulShutdown = async (signal) => {
     // Stop accepting new requests
     app.set("trust proxy", false);
 
-    // Close WhatsApp client
-    if (whatsappService && whatsappService.client) {
-      console.log("Destroying WhatsApp client...");
-      await whatsappService.client.destroy();
+    // Close all WhatsApp clients
+    for (const user of userData.values()) {
+      if (user.whatsappService && user.whatsappService.client) {
+        console.log(
+          `Destroying WhatsApp client for user ${user.whatsappService.userId}...`
+        );
+        await user.whatsappService.client.destroy();
+      }
     }
 
     console.log("Graceful shutdown completed");
@@ -132,19 +165,14 @@ process.on("unhandledRejection", (reason, promise) => {
 // Start the server
 (async () => {
   try {
-    const CONTACTS_FILE = path.join(__dirname, "contacts.xlsx");
-
-    // Initialize directory and file structure
-    await ensureDirectoryExists(path.dirname(CONTACTS_FILE));
-    await initializeMessageFile(__dirname);
-
-    // Create contacts file if it doesn't exist
-    await contactService.initializeContactsFile();
+    await initializeUsers();
 
     const server = app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
       console.log(`PID: ${process.pid}`);
-      console.log(`Visit http://localhost:${port}/bot/qr to generate QR code`);
+      console.log(
+        `Visit http://localhost:${port}/bot/1/qr for user 1 QR code (example)`
+      );
     });
 
     // Handle server errors

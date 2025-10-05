@@ -1,4 +1,3 @@
-// src/services/WhatsAppService.js
 import pkg from "whatsapp-web.js";
 import qrcode from "qrcode";
 import path from "path";
@@ -12,13 +11,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export class WhatsAppService {
-  constructor() {
+  constructor(rootDir, userId) {
+    this.rootDir = rootDir;
+    this.userId = userId;
     this.client = null;
     this.clientReady = false;
     this.isInitializing = false;
-    this.contactService = new ContactService(
-      path.dirname(path.dirname(__dirname))
-    );
+    this.contactService = new ContactService(rootDir);
   }
 
   initializeClient() {
@@ -31,7 +30,7 @@ export class WhatsAppService {
 
     try {
       this.client = new Client({
-        authStrategy: new LocalAuth(),
+        authStrategy: new LocalAuth({ clientId: `user${this.userId}` }),
         puppeteer: {
           headless: true,
           args: [
@@ -47,27 +46,32 @@ export class WhatsAppService {
       });
 
       this.client.on("ready", () => {
-        console.log("WhatsApp client is ready!");
+        console.log(`WhatsApp client for user ${this.userId} is ready!`);
         this.clientReady = true;
         this.isInitializing = false;
       });
 
       this.client.on("disconnected", (reason) => {
-        console.log("WhatsApp client disconnected:", reason);
+        console.log(
+          `WhatsApp client for user ${this.userId} disconnected:`,
+          reason
+        );
         this.clientReady = false;
         this.isInitializing = false;
+        adino;
         this.client = null;
       });
 
-      // In generateQRCode method, after setting up event handlers:
       this.client.on("authenticated", () => {
-        console.log("WhatsApp client is authenticated!");
+        console.log(
+          `WhatsApp client for user ${this.userId} is authenticated!`
+        );
 
         // Set a timeout to check if ready event fires within reasonable time
         setTimeout(() => {
           if (!this.clientReady) {
             console.error(
-              "❌ Ready event did not fire within 10 seconds after authentication!"
+              `❌ Ready event did not fire within 10 seconds after authentication for user ${this.userId}!`
             );
             console.log("Attempting to manually check client state...");
 
@@ -84,13 +88,19 @@ export class WhatsAppService {
       });
 
       this.client.initialize().catch((err) => {
-        console.error("Failed to initialize WhatsApp client:", err);
+        console.error(
+          `Failed to initialize WhatsApp client for user ${this.userId}:`,
+          err
+        );
         this.clientReady = false;
         this.isInitializing = false;
         this.client = null;
       });
     } catch (error) {
-      console.error("Error creating WhatsApp client:", error);
+      console.error(
+        `Error creating WhatsApp client for user ${this.userId}:`,
+        error
+      );
       this.clientReady = false;
       this.isInitializing = false;
       this.client = null;
@@ -112,7 +122,10 @@ export class WhatsAppService {
             await this.client.destroy();
           }
         } catch (destroyError) {
-          console.warn("Error destroying existing client:", destroyError);
+          console.warn(
+            `Error destroying existing client for user ${this.userId}:`,
+            destroyError
+          );
           // Continue anyway - don't let destroy errors block new client creation
         }
         this.client = null;
@@ -130,7 +143,7 @@ export class WhatsAppService {
 
       // Initialize a new client
       this.client = new Client({
-        authStrategy: new LocalAuth(),
+        authStrategy: new LocalAuth({ clientId: `user${this.userId}` }),
         puppeteer: {
           headless: true,
           args: [
@@ -150,7 +163,7 @@ export class WhatsAppService {
         if (qrSent) return;
 
         try {
-          console.log("QR Code received");
+          console.log(`QR Code received for user ${this.userId}`);
           const qrImageUrl = await qrcode.toDataURL(qr);
 
           if (!res.headersSent) {
@@ -163,7 +176,7 @@ export class WhatsAppService {
             res.status(200).send(`
             <html>
               <head>
-                <title>WhatsApp QR Code</title>
+                <title>WhatsApp QR Code - User ${this.userId}</title>
                 <meta http-equiv="refresh" content="30">
               </head>
               <body style="text-align: center; font-family: Arial, sans-serif;">
@@ -174,7 +187,10 @@ export class WhatsAppService {
           `);
           }
         } catch (err) {
-          console.error("Error generating QR code image:", err);
+          console.error(
+            `Error generating QR code image for user ${this.userId}:`,
+            err
+          );
           if (!res.headersSent && !qrSent) {
             qrSent = true;
             if (timeoutId) {
@@ -187,21 +203,24 @@ export class WhatsAppService {
       });
 
       this.client.on("ready", () => {
-        console.log("🚀 WhatsApp client is ready!");
+        console.log(`🚀 WhatsApp client for user ${this.userId} is ready!`);
         console.log("Setting clientReady to true...");
         this.clientReady = true;
         this.isInitializing = false;
         console.log("clientReady is now:", this.clientReady);
-
-        // ... rest of ready handler
       });
 
       this.client.on("authenticated", () => {
-        console.log("WhatsApp client is authenticated!");
+        console.log(
+          `WhatsApp client for user ${this.userId} is authenticated!`
+        );
       });
 
       this.client.on("auth_failure", (err) => {
-        console.error("WhatsApp authentication failed:", err);
+        console.error(
+          `WhatsApp authentication failed for user ${this.userId}:`,
+          err
+        );
 
         if (!res.headersSent && !qrSent) {
           qrSent = true;
@@ -215,16 +234,15 @@ export class WhatsAppService {
 
       this.client.on("disconnected", (reason) => {
         console.log(
-          "WhatsApp client disconnected during QR generation:",
+          `WhatsApp client for user ${this.userId} disconnected during QR generation:`,
           reason
         );
         this.clientReady = false;
-        // Don't set client to null here as it might be used elsewhere
       });
 
       // Add error handler for client initialization errors
       this.client.on("error", (error) => {
-        console.error("WhatsApp client error:", error);
+        console.error(`WhatsApp client error for user ${this.userId}:`, error);
 
         if (!res.headersSent && !qrSent) {
           qrSent = true;
@@ -240,7 +258,10 @@ export class WhatsAppService {
       this.isInitializing = true;
       await this.client.initialize();
     } catch (err) {
-      console.error("Failed to initialize WhatsApp client for QR:", err);
+      console.error(
+        `Failed to initialize WhatsApp client for QR for user ${this.userId}:`,
+        err
+      );
 
       // Clean up timeout if it exists
       if (timeoutId) {
@@ -325,26 +346,32 @@ export class WhatsAppService {
           }
 
           await this.client.sendMessage(chatId, media, { caption });
-          console.log("sent media message");
+          console.log(`sent media message for user ${this.userId}`);
         } else {
           await this.client.sendMessage(chatId, caption);
-          console.log("sent text message");
+          console.log(`sent text message for user ${this.userId}`);
         }
 
         contact.sent = true;
         results.sent++;
-        console.log(`Message sent to ${number}`);
+        console.log(`Message sent to ${number} for user ${this.userId}`);
 
         // Add delay between messages to avoid being blocked
         await new Promise((resolve) => setTimeout(resolve, 2000));
       } catch (err) {
         results.failed++;
         results.errors.push({ number, error: err.message });
-        console.error(`Failed to send message to ${number}:`, err.message);
+        console.error(
+          `Failed to send message to ${number} for user ${this.userId}:`,
+          err.message
+        );
       }
     }
 
-    console.log("contacts to update ->", unsentContacts);
+    console.log(
+      `contacts to update for user ${this.userId} ->`,
+      unsentContacts
+    );
     this.contactService.updateContactStatusInExcel(unsentContacts, true);
 
     return results;
@@ -357,15 +384,17 @@ export class WhatsAppService {
 
     try {
       await this.client.logout();
-      console.log("WhatsApp client logged out successfully");
+      console.log(
+        `WhatsApp client logged out successfully for user ${this.userId}`
+      );
     } catch (error) {
-      console.error("Error during logout:", error);
+      console.error(`Error during logout for user ${this.userId}:`, error);
     }
 
     try {
       await this.client.destroy();
     } catch (error) {
-      console.error("Error destroying client:", error);
+      console.error(`Error destroying client for user ${this.userId}:`, error);
     }
 
     this.client = null;
@@ -376,16 +405,20 @@ export class WhatsAppService {
     if (removeAuth === true) {
       try {
         const authFolder = path.join(
-          path.dirname(path.dirname(__dirname)),
-          ".wwebjs_auth"
+          process.cwd(),
+          ".wwebjs_auth",
+          `session-user${this.userId}`
         );
         if (existsSync(authFolder)) {
           await fs.rm(authFolder, { recursive: true, force: true });
-          console.log("Authentication data removed");
+          console.log(`Authentication data removed for user ${this.userId}`);
           authRemoved = true;
         }
       } catch (error) {
-        console.error("Failed to remove authentication data:", error);
+        console.error(
+          `Failed to remove authentication data for user ${this.userId}:`,
+          error
+        );
       }
     }
 
@@ -393,7 +426,7 @@ export class WhatsAppService {
   }
 
   getStatus() {
-    console.log("=== Status Check ===");
+    console.log(`=== Status Check for user ${this.userId} ===`);
     console.log("this.clientReady:", this.clientReady);
     console.log("this.client exists:", !!this.client);
     console.log("this.isInitializing:", this.isInitializing);
