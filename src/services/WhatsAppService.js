@@ -136,7 +136,10 @@ export class WhatsAppService {
                   </body>
                 </html>
               `);
+              this.clientReady = true;
+              this.isInitializing = false;
             }
+
             return;
           }
         } catch (stateError) {
