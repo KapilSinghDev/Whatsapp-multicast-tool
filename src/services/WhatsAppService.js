@@ -114,7 +114,41 @@ export class WhatsAppService {
     let timeoutId = null;
 
     try {
-      // Clean up existing client if it exists
+      // Check if we have an existing ready client
+      if (this.client && this.clientReady) {
+        console.log(`Reusing existing ready client for user ${this.userId}`);
+
+        // Generate QR from existing session (if needed) or inform that client is already authenticated
+        try {
+          const state = await this.client.getState();
+
+          if (state === "CONNECTED") {
+            // Client is already connected, no QR needed
+            if (!res.headersSent) {
+              res.status(200).send(`
+                <html>
+                  <head>
+                    <title>WhatsApp Status - User ${this.userId}</title>
+                  </head>
+                  <body style="text-align: center; font-family: Arial, sans-serif;">
+                    <h2>✅ WhatsApp is already connected!</h2>
+                    <p>Your WhatsApp client is ready to use.</p>
+                  </body>
+                </html>
+              `);
+            }
+            return;
+          }
+        } catch (stateError) {
+          console.warn(
+            `Could not get client state for user ${this.userId}:`,
+            stateError
+          );
+          // Fall through to destroy and reinitialize
+        }
+      }
+
+      // Clean up existing client if it exists and is not ready or had errors
       if (this.client) {
         try {
           // Check if client has pupPage before calling destroy
@@ -158,6 +192,7 @@ export class WhatsAppService {
         },
       });
       console.log("-----------------initialised a new client-----------------");
+
       // Set up event handlers BEFORE initializing
       this.client.on("qr", async (qr) => {
         if (qrSent) return;
