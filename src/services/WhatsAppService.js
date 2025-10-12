@@ -20,94 +20,94 @@ export class WhatsAppService {
     this.contactService = new ContactService(rootDir);
   }
 
-  initializeClient() {
-    // Prevent multiple initializations
-    if (this.client || this.isInitializing) {
-      return this.client;
-    }
+  // initializeClient() {
+  //   // Prevent multiple initializations
+  //   if (this.client || this.isInitializing) {
+  //     return this.client;
+  //   }
 
-    this.isInitializing = true;
+  //   this.isInitializing = true;
 
-    try {
-      this.client = new Client({
-        authStrategy: new LocalAuth({ clientId: `user${this.userId}` }),
-        puppeteer: {
-          headless: true,
-          args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-accelerated-2d-canvas",
-            "--no-first-run",
-            "--no-zygote",
-            "--disable-gpu",
-          ],
-        },
-      });
+  //   try {
+  //     this.client = new Client({
+  //       authStrategy: new LocalAuth({ clientId: `user${this.userId}` }),
+  //       puppeteer: {
+  //         headless: true,
+  //         args: [
+  //           "--no-sandbox",
+  //           "--disable-setuid-sandbox",
+  //           "--disable-dev-shm-usage",
+  //           "--disable-accelerated-2d-canvas",
+  //           "--no-first-run",
+  //           "--no-zygote",
+  //           "--disable-gpu",
+  //         ],
+  //       },
+  //     });
 
-      this.client.on("ready", () => {
-        console.log(`WhatsApp client for user ${this.userId} is ready!`);
-        this.clientReady = true;
-        this.isInitializing = false;
-      });
+  //     this.client.on("ready", () => {
+  //       console.log(`WhatsApp client for user ${this.userId} is ready!`);
+  //       this.clientReady = true;
+  //       this.isInitializing = false;
+  //     });
 
-      this.client.on("disconnected", (reason) => {
-        console.log(
-          `WhatsApp client for user ${this.userId} disconnected:`,
-          reason
-        );
-        this.clientReady = false;
-        this.isInitializing = false;
-        adino;
-        this.client = null;
-      });
+  //     this.client.on("disconnected", (reason) => {
+  //       console.log(
+  //         `WhatsApp client for user ${this.userId} disconnected:`,
+  //         reason
+  //       );
+  //       this.clientReady = false;
+  //       this.isInitializing = false;
+  //       adino;
+  //       this.client = null;
+  //     });
 
-      this.client.on("authenticated", () => {
-        console.log(
-          `WhatsApp client for user ${this.userId} is authenticated!`
-        );
+  //     this.client.on("authenticated", () => {
+  //       console.log(
+  //         `WhatsApp client for user ${this.userId} is authenticated!`
+  //       );
 
-        // Set a timeout to check if ready event fires within reasonable time
-        setTimeout(() => {
-          if (!this.clientReady) {
-            console.error(
-              `❌ Ready event did not fire within 10 seconds after authentication for user ${this.userId}!`
-            );
-            console.log("Attempting to manually check client state...");
+  //       // Set a timeout to check if ready event fires within reasonable time
+  //       setTimeout(() => {
+  //         if (!this.clientReady) {
+  //           console.error(
+  //             `❌ Ready event did not fire within 10 seconds after authentication for user ${this.userId}!`
+  //           );
+  //           console.log("Attempting to manually check client state...");
 
-            // Try to force ready state if client seems functional
-            if (this.client && this.client.info) {
-              console.log(
-                "Client info available, manually setting ready state"
-              );
-              this.clientReady = true;
-              this.isInitializing = false;
-            }
-          }
-        }, 10000); // Wait 10 seconds after authentication
-      });
+  //           // Try to force ready state if client seems functional
+  //           if (this.client && this.client.info) {
+  //             console.log(
+  //               "Client info available, manually setting ready state"
+  //             );
+  //             this.clientReady = true;
+  //             this.isInitializing = false;
+  //           }
+  //         }
+  //       }, 10000); // Wait 10 seconds after authentication
+  //     });
 
-      this.client.initialize().catch((err) => {
-        console.error(
-          `Failed to initialize WhatsApp client for user ${this.userId}:`,
-          err
-        );
-        this.clientReady = false;
-        this.isInitializing = false;
-        this.client = null;
-      });
-    } catch (error) {
-      console.error(
-        `Error creating WhatsApp client for user ${this.userId}:`,
-        error
-      );
-      this.clientReady = false;
-      this.isInitializing = false;
-      this.client = null;
-    }
+  //     this.client.initialize().catch((err) => {
+  //       console.error(
+  //         `Failed to initialize WhatsApp client for user ${this.userId}:`,
+  //         err
+  //       );
+  //       this.clientReady = false;
+  //       this.isInitializing = false;
+  //       this.client = null;
+  //     });
+  //   } catch (error) {
+  //     console.error(
+  //       `Error creating WhatsApp client for user ${this.userId}:`,
+  //       error
+  //     );
+  //     this.clientReady = false;
+  //     this.isInitializing = false;
+  //     this.client = null;
+  //   }
 
-    return this.client;
-  }
+  //   return this.client;
+  // }
 
   async generateQRCode(res) {
     let qrSent = false; // Prevent multiple res.send()
@@ -157,7 +157,7 @@ export class WhatsAppService {
           ],
         },
       });
-
+      console.log("-----------------initialised a new client-----------------");
       // Set up event handlers BEFORE initializing
       this.client.on("qr", async (qr) => {
         if (qrSent) return;
@@ -379,10 +379,12 @@ export class WhatsAppService {
 
   async logout(removeAuth = false) {
     if (!this.client) {
+      console.log("attempted to logout even when no client existed");
       throw new Error("No active WhatsApp session found");
     }
 
     try {
+      console.log("attempting a logout");
       await this.client.logout();
       console.log(
         `WhatsApp client logged out successfully for user ${this.userId}`
@@ -428,7 +430,7 @@ export class WhatsAppService {
   getStatus() {
     console.log(`=== Status Check for user ${this.userId} ===`);
     console.log("this.clientReady:", this.clientReady);
-    console.log("this.client exists:", !!this.client);
+    console.log("this.client exists ======>    :  ", !this.client);
     console.log("this.isInitializing:", this.isInitializing);
 
     return {
