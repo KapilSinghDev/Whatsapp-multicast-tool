@@ -6,11 +6,12 @@ import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 import fs from "fs/promises";
 import { ContactService } from "./ContactService.js";
-
+import jwt from "jsonwebtoken";
+import creds from "../creds/creds.json" with { type: "json" };;
 const { Client, LocalAuth, MessageMedia } = pkg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
+const secretKey = "sfsafweljwerjwel";
 export class WhatsAppService {
   constructor() {
     this.client = null;
@@ -403,5 +404,74 @@ export class WhatsAppService {
       client: this.client ? "initialized" : "not_initialized",
       initializing: this.isInitializing,
     };
+  }
+
+  async generateToken(mobile, name, password) {
+    const token = jwt.sign({ mobile, name, password }, secretKey, {
+      expiresIn: "4h",
+    });
+    return token;
+  }
+
+  async saveToJson(mobile, name, password) {
+    try {
+      const newObject = {
+        mobile,
+        name,
+        password,
+      };
+
+      const filePath = path.join(__dirname, "../creds/creds.json");
+      await fs.writeFile(filePath, JSON.stringify(newObject, null, 2));
+      console.log("Data successfully written to creds.json");
+      return true;
+    } catch (err) {
+      console.error("Error writing to creds.json:", err);
+      return false;
+    }
+  }
+
+  async savdToken(token, status) {
+    try {
+      const newAuth = {
+        token,
+        status,
+      };
+      const filePath = path.join(__dirname, "../creds/auth.json");
+      await fs.writeFile(filePath, JSON.stringify(newAuth, null, 2));
+    } catch (err) {
+      console.error("Error writing  token:", err);
+    }
+  }
+
+  async verify(token) {
+    // read user and decode it
+    const decode = jwt.verify(token, secretKey);
+    if (decode.name === creds.name && decode.mobile === creds.mobile) {
+      return true;
+    }
+    return false;
+  }
+
+  async exit (){
+    // reset the auth and creds as empty
+    const newFreeObjectAuth = {
+      token:"",
+      status:false,
+    }
+    const newFreeObjectCreds = {
+      mobile:"",
+      name:"",password:""
+    }
+    try{
+      const authFile = path.join(__dirname, "../creds/auth.json");
+      const credsFile = path.join(__dirname, "../creds/creds.json");
+      await fs.writeFile(authFile,JSON.stringify(newFreeObjectAuth,null,2))
+      await fs.writeFile(credsFile,JSON.stringify(newFreeObjectCreds,null,2))
+      return true;
+    } catch (err) {
+      console.log("An error occured while writing in auth.json or creds.json",err)
+    }
+    return false;
   }
 }

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Bot Login</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="login-container">
+        <h1>WhatsApp Bot Login</h1>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="userId">Mobile number</label>
+                <input placeholder="enter only 10 digits of the number" type="phone" id="user-phone" name="userPhone" required>
+            </div>
+            <div class="form-group">
+                <label for="userId">Name</label>
+                <input placeholder="enter your name" type="phone" id="user-name" name="userName" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <p id="error-message" class="error" style="display: none;"></p>
+    </div>
+    <script src="index.js"></script>
+</body>
+</html>

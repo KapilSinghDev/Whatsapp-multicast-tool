@@ -1,8 +1,8 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs"; // ✅ Import fs for ES modules
 import {
   ensureDirectoryExists,
   initializeMessageFile,
@@ -18,7 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 3000; // Fixed: was using undefined 'env'
+const port = process.env.PORT || 3000;
 
 // Prevent multiple signal listeners (fixes PM2 memory leak warnings)
 process.setMaxListeners(20);
@@ -30,12 +30,47 @@ process.removeAllListeners("exit");
 // Initialize services
 const whatsappService = new WhatsAppService();
 const contactService = new ContactService(__dirname);
-const messageService = new MessageService(); // Fixed: missing semicolon
+const messageService = new MessageService();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ✅ Serve static files from src/private - ONLY ONCE!
+const staticDir = path.join(__dirname, "src", "private");
+
+// Debug logging
+console.log("Static directory:", staticDir);
+console.log("Does directory exist?", fs.existsSync(staticDir));
+console.log(
+  "CSS file exists?",
+  fs.existsSync(path.join(staticDir, "static", "index.css"))
+);
+console.log(
+  "JS file exists?",
+  fs.existsSync(path.join(staticDir, "static", "index.js"))
+);
+
+// Serve static files - BEFORE other middleware
+app.use(
+  express.static(staticDir, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".js")) {
+        res.setHeader("Content-Type", "text/javascript");
+      }
+      if (filePath.endsWith(".css")) {
+        res.setHeader("Content-Type", "text/css");
+      }
+    },
+  })
+);
+
+// Debug middleware to see all requests (comes AFTER static serving)
+app.use((req, res, next) => {
+  console.log("Request URL:", req.url);
+  next();
+});
 
 // Routes
 app.use(
@@ -57,7 +92,7 @@ app.get("/", (req, res) => {
       clientInitialized: status.client === "initialized",
       message:
         "WhatsApp Bot Server is running. Visit /bot/qr to generate QR code.",
-      pid: process.pid, // Helpful for PM2 debugging
+      pid: process.pid,
       uptime: process.uptime(),
     });
   } catch (error) {
@@ -88,7 +123,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Graceful shutdown handlers (use 'once' to prevent multiple listeners)
+// Graceful shutdown handlers
 let isShuttingDown = false;
 
 const gracefulShutdown = async (signal) => {

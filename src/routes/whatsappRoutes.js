@@ -1,38 +1,67 @@
 // src/routes/whatsappRoutes.js
-import express from 'express';
-import { WhatsAppController } from '../controllers/WhatsAppController.js';
-
-export default function whatsappRoutes(whatsappService, contactService,messageService ,uploadMiddleware) {
+import express from "express";
+import { WhatsAppController } from "../controllers/WhatsAppController.js";
+import checkAuth from "../middleware/authenticate.js";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+import path from "path";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+export default function whatsappRoutes(
+  whatsappService,
+  contactService,
+  messageService,
+  uploadMiddleware
+) {
   const router = express.Router();
-  const controller = new WhatsAppController(whatsappService, contactService,messageService);
+  const controller = new WhatsAppController(
+    whatsappService,
+    contactService,
+    messageService
+  );
 
   // QR Code generation
-  router.get('/qr', (req, res) => controller.generateQR(req, res));
+  router.get("/qr", (req, res) => controller.generateQR(req, res));
 
   // File upload for contacts
-  router.post('/numbers', uploadMiddleware.single('file'), (req, res) => 
+  router.post("/numbers", uploadMiddleware.single("file"), (req, res) =>
     controller.uploadContacts(req, res)
   );
 
   // Media upload
-  router.post('/media', uploadMiddleware.fields([{ name: 'media', maxCount: 1 }]), (req, res) => 
-    controller.uploadMedia(req, res)
+  router.post(
+    "/media",
+    uploadMiddleware.fields([{ name: "media", maxCount: 1 }]),
+    (req, res) => controller.uploadMedia(req, res)
   );
 
   // Message and salutation setup
-  router.post('/salutations', (req, res) => controller.setSalutations(req, res));
+  router.post("/salutations", (req, res) =>
+    controller.setSalutations(req, res)
+  );
 
   // Start messaging
-  router.post('/start', (req, res) => controller.startMessaging(req, res));
+  router.post("/start", (req, res) => controller.startMessaging(req, res));
 
   // Clear data
-  router.post('/clear', (req, res) => controller.clearData(req, res));
+  router.post("/clear", (req, res) => controller.clearData(req, res));
 
   // Logout
-  router.post('/logout', (req, res) => controller.logout(req, res));
+  router.post("/logout", (req, res) => controller.logout(req, res));
 
   // Status check
-  router.get('/status', (req, res) => controller.getStatus(req, res));
+  router.get("/status", (req, res) => controller.getStatus(req, res));
+
+  // authenitcation
+  router.post("/auth", (req, res) => controller.login(req, res));
+
+  // verify
+  router.post("/verify", checkAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "private", "index.html"));
+  });
+
+  // /auth/logout
+  router.post("/auth/logout", (req, res) => controller.userLogout(req, res));
 
   return router;
 }
