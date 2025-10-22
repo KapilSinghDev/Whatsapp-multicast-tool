@@ -446,11 +446,18 @@ export class WhatsAppService {
 
   async verify(token) {
     // read user and decode it
+    console.log(" ==== >");
     const decode = jwt.verify(token, secretKey);
-    if (decode.name === creds.name && decode.mobile === creds.mobile) {
+    try {
+      if (decode.name === creds.name && decode.mobile === creds.mobile) {
       return true;
     }
     return false;
+    }catch (err) {
+      console.log("an error occured :possible JWT expired",err)
+      return;
+    }
+    
   }
 
   async exit (){
