@@ -46,6 +46,9 @@ export default function whatsappRoutes(
   // Clear data
   router.post("/clear", (req, res) => controller.clearData(req, res));
 
+  // delete contacts
+  router.delete("/delete", (req, res) => controller.deleteContacts(req, res));
+
   // Logout
   router.post("/logout", (req, res) => controller.logout(req, res));
 
@@ -72,7 +75,13 @@ export default function whatsappRoutes(
   });
 
   // /auth/logout
-  router.post("/auth/logout", (req, res) => controller.userLogout(req, res));
+  router.post("/auth/logout", checkAuth, (req, res) => {
+    if (!req.isAuthenticated) {
+      res.sendFile(path.join(__dirname, "..", "public", "unavailable.html"));
+    } else {
+      controller.userLogout(req, res);
+    }
+  });
 
   return router;
 }

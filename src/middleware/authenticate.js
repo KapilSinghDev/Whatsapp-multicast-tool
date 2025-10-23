@@ -7,8 +7,13 @@ const whatsappService = new WhatsAppService();
 
 const checkAuth = async (req, res, next) => {
   try {
-    const token = req.body.token;
-    console.log(token, 'token received');
+    
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : null;
+
+    console.log(authHeader, "token received");
     
     // 1. Check if token exists
     if (!token) {

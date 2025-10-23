@@ -205,6 +205,23 @@ export class WhatsAppController {
     }
   }
 
+  async deleteContacts (req,res) {
+    try{
+      this.contactService.clearContactsFromExcel();
+      console.log("all contacts were deleted");
+      res.status(200).json({
+        status: 200,
+        message: "All contacts were permanently deleted",
+      });
+    } catch(err){
+      console.log("Error while deleting the contacts",err)
+      res.status(500).json({
+        status: 500,
+        message: "error while deleting contacts permanently",
+      });
+    }
+  }
+
   async logout(req, res) {
     try {
       const { removeAuth } = req.body;
@@ -289,39 +306,90 @@ async verifyUser (req,res) {
   }
 }
 
-async userLogout (req, res) {
-  const {token} = req.body;
+async userLogout(req, res) {
   try {
-    // verify the token that logout is valid or not 
-    const verification = await this.whatsappService.verify(token)
+    const authHeader = req.headers.authorization;
+    // ✅ Properly extract the token
+    const token = authHeader && authHeader.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : null;
 
-    if(verification){
-      console.log("reachable code", verification)
-      const exitStatus = await this.whatsappService.exit()  // ← Fixed: lowercase 'w'
-      
-      if(exitStatus === true){
+    if (!token) {
+      return res.status(400).send({
+        status: 400,
+        message: "Token missing in header",
+      });
+    }
+
+    // ✅ Verify the token
+    const verification = await this.whatsappService.verify(token);
+
+    if (verification) {
+      console.log("reachable code", verification);
+
+      const exitStatus = await this.whatsappService.exit();
+
+      if (exitStatus === true) {
         return res.status(200).send({
           status: 200,
-          message: "User logged out successfully"
-        })
+          message: "User logged out successfully",
+        });
       } else {
-        return res.status(500).send({  // ← Fixed: .status() not .send()
+        return res.status(500).send({
           status: 500,
-          message: "An error occured while logout"
-        })
+          message: "An error occurred while logging out",
+        });
       }
     } else {
-      return res.status(404).send({
-        status: 404,
-        message: "UnAuthorised"
-      })
+      return res.status(401).send({
+        status: 401,
+        message: "Unauthorized",
+      });
     }
   } catch (err) {
-    console.log("An error occured while loggin out", err)
-    return res.status(500).send({  // ← Fixed: .status() not .send()
+    console.error("An error occurred while logging out:", err);
+    return res.status(500).send({
       status: 500,
-      message: "Bad request"
-    })
+      message: "Bad request",
+    });
   }
 }
+
 }
+
+// async userLogout (req, res) {
+//     const authHeader = req.headers.authorization;
+//     const token = authHeader && authHeader.startsWith("Bearer ")
+//   try {
+//     // verify the token that logout is valid or not 
+//     const verification = await this.whatsappService.verify(token)
+
+//     if(verification){
+//       console.log("reachable code", verification)
+//       const exitStatus = await this.whatsappService.exit()  // ← Fixed: lowercase 'w'
+      
+//       if(exitStatus === true){
+//         return res.status(200).send({
+//           status: 200,
+//           message: "User logged out successfully"
+//         })
+//       } else {
+//         return res.status(500).send({  // ← Fixed: .status() not .send()
+//           status: 500,
+//           message: "An error occured while logout"
+//         })
+//       }
+//     } else {
+//       return res.status(404).send({
+//         status: 404,
+//         message: "UnAuthorised"
+//       })
+//     }
+//   } catch (err) {
+//     console.log("An error occured while loggin out", err)
+//     return res.status(500).send({  // ← Fixed: .status() not .send()
+//       status: 500,
+//       message: "Bad request"
+//     })
+//   }
+// } this shows error why 

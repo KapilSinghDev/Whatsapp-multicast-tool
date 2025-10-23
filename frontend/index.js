@@ -139,8 +139,8 @@ async function verifyToken(token) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ token }),
     });
 
     console.log("📥 Verify response status:", response.status);
