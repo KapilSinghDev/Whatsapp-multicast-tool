@@ -471,8 +471,8 @@ export class WhatsAppService {
       name:"",password:""
     }
     try{
-      const authFile = path.join(__dirname, "../creds/auth.json");
-      const credsFile = path.join(__dirname, "../creds/creds.json");
+      const authFile = path.join(process.cwd(), "src/creds/auth.json");
+      const credsFile = path.join(process.cwd(), "src/creds/creds.json");
       await fs.writeFile(authFile,JSON.stringify(newFreeObjectAuth,null,2))
       await fs.writeFile(credsFile,JSON.stringify(newFreeObjectCreds,null,2))
       return true;

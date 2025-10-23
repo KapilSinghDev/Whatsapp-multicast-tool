@@ -8,12 +8,19 @@ const whatsappService = new WhatsAppService();
 const checkAuth = async (req, res, next) => {
   try {
     
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : null;
+    // Normalize header to handle case differences or stripped Bearer
+const authHeader = req.headers.authorization || req.headers.Authorization;
+let token = null;
 
-    console.log(authHeader, "token received");
+if (authHeader) {
+  const parts = authHeader.split(" ");
+  if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+    token = parts[1];
+  }
+}
+
+console.log("full header:", req.headers);
+
     
     // 1. Check if token exists
     if (!token) {
