@@ -10,22 +10,20 @@ const checkAuth = async (req, res, next) => {
     const token = req.body.token;
     console.log(token, 'token received');
     
-    // 1. First check if token exists
+    // 1. Check if token exists
     if (!token) {
-      return res.status(401).send({
-        status: 401,
-        message: "No token provided",
-      });
+      req.isAuthenticated = false;
+      req.authMessage = "No token provided";
+      return next(); // CHANGED: Call next() instead of sending response
     }
 
-    // 2. Decode the token to check expiration
+    // 2. Decode the token
     const decoded = jwt.decode(token);
     
     if (!decoded) {
-      return res.status(401).send({
-        status: 401,
-        message: "Invalid token format",
-      });
+      req.isAuthenticated = false;
+      req.authMessage = "Invalid token format";
+      return next(); // CHANGED
     }
 
     // 3. Check if token is expired
@@ -35,41 +33,34 @@ const checkAuth = async (req, res, next) => {
       console.log("Token expiry (seconds):", decoded.exp);
       
       if (decoded.exp < currentTimeInSeconds) {
-        // Use whatsappService (not this.whatsappService)
         const exit = await whatsappService.exit();
         
-        if(exit){
-          return res.status(401).send({
-            status: 401,
-            message: "Session expired ! Login Again",
-          });
-        }
-        return res.status(401).send({
-          status: 401,
-          message: "Error eliminating user",
-        });
+        req.isAuthenticated = false;
+        req.authMessage = exit ? "Session expired ! Login Again" : "Error eliminating user";
+        return next(); // CHANGED
       }
     }
 
-    // 4. Finally verify the token signature
+    // 4. Verify the token signature
     const isAuthenticated = await whatsappService.verify(token);
     console.log("Is authenticated:", isAuthenticated);
+    console.log("status:", auth.status);
     
     if (isAuthenticated && auth.status === true) {
-      // Token is valid, proceed to next middleware/route
+      console.log("redirecting to authenticated", auth.status);
+      req.isAuthenticated = true;
       next();
     } else {
-      return res.status(401).send({
-        status: 401,
-        message: "Invalid token",
-      });
+      console.log("redirecting to unauthorised");
+      req.isAuthenticated = false;
+      req.authMessage = "Invalid token";
+      next(); // CHANGED
     }
   } catch (err) {
     console.error("Authentication error:", err);
-    return res.status(401).send({
-      status: 401,
-      message: "Authentication failed",
-    });
+    req.isAuthenticated = false;
+    req.authMessage = "Authentication failed";
+    next(); // CHANGED
   }
 };
 

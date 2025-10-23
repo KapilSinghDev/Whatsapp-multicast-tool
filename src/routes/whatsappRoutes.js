@@ -57,7 +57,18 @@ export default function whatsappRoutes(
 
   // verify
   router.post("/verify", checkAuth, (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "private", "index.html"));
+    console.log("verifu route", req.isAuthenticated);
+    if (req.isAuthenticated) {
+      // Authenticated - send dashboard
+      res.sendFile(path.join(__dirname, "..", "private", "index.html"));
+    } else {
+      if (req.authMessage === "No token provided") {
+        return res.redirect("/");
+      }
+      console.log("redirecting to unauthenticated route");
+      // Not authenticated - send login page
+      res.sendFile(path.join(__dirname, "..", "public", "unavailable.html"));
+    }
   });
 
   // /auth/logout

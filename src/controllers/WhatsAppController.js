@@ -231,7 +231,7 @@ export class WhatsAppController {
   }
 
 async login(req, res) {
-  // console.log("here reached")
+  console.log("login requested",req.body)
   const { mobile, name, password } = req.body;
   console.log(req.body);
   if (password === pass.password && auth.status === false ) { 
@@ -264,10 +264,11 @@ async login(req, res) {
       return res.status(500).send({ message: "an active user session already exists cant login now" });
     }
     
-  } else {
+  }
+   else {
     return res.status(400).send({ // Syntax error
       status: 401,
-      message: "Unauthorised user",
+      message:auth.status?"Wait for a while bot is being currently used": "Unauthorised user",
     });
   }
 }

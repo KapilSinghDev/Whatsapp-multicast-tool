@@ -144,7 +144,12 @@
   </main>
 
   <script>
-    document.getElementById('reloadBtn').addEventListener('click', () => location.reload());
-  </script>
+  document.getElementById('reloadBtn').addEventListener('click', () => {
+    console.log('Clearing botToken from localStorage before reload');
+    localStorage.removeItem('botToken'); // Delete the token
+    console.log('Token cleared, reloading page');
+    location.reload('/'); // Reload to root URL
+  });
+</script>
 </body>
 </html>
